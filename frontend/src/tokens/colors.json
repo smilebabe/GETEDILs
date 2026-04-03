@@ -1,0 +1,61 @@
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    "./src/**/*.{js,jsx,ts,tsx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        ethio: {
+          green: '#009739',  // Prosperity & Land
+          yellow: '#FFD100', // Hope & Peace
+          red: '#EF3340',    // Valor & Sacrifice
+          gold: '#D4AF37',   // Heritage & Sovereignty
+          black: '#0A0A0A',  // Deep Slate for GETEDIL-OS Dark Mode
+        },
+        // Functional Glass Colors
+        glass: {
+          DEFAULT: 'rgba(255, 255, 255, 0.05)',
+          medium: 'rgba(255, 255, 255, 0.12)',
+          heavy: 'rgba(255, 255, 255, 0.25)',
+        }
+      },
+      backgroundImage: {
+        'tilet-pattern': "url('/assets/images/tilet-pattern.png')",
+        'meskel-pattern': "url('/assets/images/meskel-pattern.png')",
+        'glass-gradient': 'linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.01))',
+      },
+      backdropBlur: {
+        xs: '2px',
+      },
+      boxShadow: {
+        'glass-soft': '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
+        'glass-border': 'inset 0 0 0 1px rgba(255, 255, 255, 0.1)',
+      }
+    },
+  },
+  plugins: [
+    // Custom plugin for specific GETEDIL-OS glass effects
+    function({ addUtilities }) {
+      addUtilities({
+        '.glass-card': {
+          'background': 'rgba(255, 255, 255, 0.05)',
+          'backdrop-filter': 'blur(16px) saturate(180%)',
+          'border': '1px solid rgba(255, 255, 255, 0.1)',
+          'border-radius': '1.25rem',
+        },
+        '.tilet-overlay': {
+          'position': 'relative',
+          '&::after': {
+            'content': '""',
+            'absolute': '0',
+            'inset': '0',
+            'background-image': "url('/assets/images/tilet-pattern.png')",
+            'opacity': '0.05',
+            'pointer-events': 'none',
+          }
+        }
+      })
+    }
+  ],
+}
