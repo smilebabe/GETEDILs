@@ -1,11 +1,4 @@
-/**
- * CRDT Engine for GETEDIL-OS
- * LWW-Element-Set (Last-Write-Wins Element Set) for Offline-First Wallet Sync
- * Prevents double-spending on spotty 4G connections
- * 
- * @version 2.0.0
- * @author GETEDIL AI Team
- */
+// frontend/src/lib/sync-engine/crdt-engine.js (Enhanced Version)
 
 class CRDTEngine {
     constructor(config = {}) {
@@ -14,89 +7,115 @@ class CRDTEngine {
         this.supabase = config.supabase;
         this.eventBus = config.eventBus;
         
-        // CRDT State
-        this.addSet = new Map(); // { operationId: { value, timestamp, clientId } }
-        this.removeSet = new Map(); // Tombstones
-        this.vectorClock = new Map(); // { clientId: counter }
-        
-        // Local queue for offline operations
+        // CRDT State with persistence
+        this.addSet = new Map();
+        this.removeSet = new Map();
+        this.vectorClock = new Map();
         this.pendingOperations = [];
-        this.conflictQueue = [];
+        this.failedOperations = [];
         
-        // Sync status
+        // Sync state
         this.isSyncing = false;
         this.lastSyncTime = null;
-        this.syncInterval = config.syncInterval || 30000; // 30 seconds
+        this.syncInterval = config.syncInterval || 30000;
+        this.maxRetries = config.maxRetries || 5;
+        this.retryDelay = config.retryDelay || 5000;
         
-        // LWW Configuration
-        this.clockSkewTolerance = config.clockSkewTolerance || 60000; // 60 seconds
-        this.maxVectorSize = config.maxVectorSize || 100;
+        // Rate limiting
+        this.lastRequestTime = 0;
+        this.minRequestInterval = 100; // 100ms between requests
         
         // Initialize
         this.init();
     }
     
-    /**
-     * Generate unique client ID
-     */
     generateClientId() {
-        return `${window.navigator.userAgent.includes('Mobile') ? 'mobile' : 'web'}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        let id = localStorage.getItem('crdt_client_id');
+        if (!id) {
+            id = `${window.navigator.userAgent.includes('Mobile') ? 'm' : 'w'}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            localStorage.setItem('crdt_client_id', id);
+        }
+        return id;
     }
     
-    /**
-     * Initialize CRDT Engine
-     */
     async init() {
-        // Load state from IndexedDB
         await this.loadState();
-        
-        // Start background sync
         this.startAutoSync();
         
-        // Listen to online/offline events
-        window.addEventListener('online', () => this.sync());
-        window.addEventListener('offline', () => this.handleOffline());
+        // Listen to online/offline events with debounce
+        window.addEventListener('online', () => {
+            console.log('[CRDT] Online detected, syncing...');
+            setTimeout(() => this.sync(), 100);
+        });
         
-        console.log(`[CRDT] Engine initialized for client: ${this.clientId}`);
+        window.addEventListener('offline', () => {
+            console.log('[CRDT] Offline mode activated');
+            this.handleOffline();
+        });
+        
+        // Periodic health check
+        setInterval(() => this.healthCheck(), 60000);
+        
+        console.log(`[CRDT] Engine v2.0 initialized: ${this.clientId}`);
     }
     
-    /**
-     * Load CRDT state from IndexedDB
-     */
     async loadState() {
         try {
             const db = await this.openIndexedDB();
-            const tx = db.transaction(['crdt'], 'readonly');
-            const store = tx.objectStore('crdt');
             
-            const addSetData = await store.get('addSet');
-            const removeSetData = await store.get('removeSet');
-            const vectorClockData = await store.get('vectorClock');
-            const pendingOps = await store.get('pendingOperations');
+            // Load all state in parallel
+            const [addSet, removeSet, vectorClock, pending, failed] = await Promise.all([
+                this.getFromDB(db, 'addSet'),
+                this.getFromDB(db, 'removeSet'),
+                this.getFromDB(db, 'vectorClock'),
+                this.getFromDB(db, 'pendingOperations'),
+                this.getFromDB(db, 'failedOperations')
+            ]);
             
-            if (addSetData) this.addSet = new Map(JSON.parse(addSetData));
-            if (removeSetData) this.removeSet = new Map(JSON.parse(removeSetData));
-            if (vectorClockData) this.vectorClock = new Map(JSON.parse(vectorClockData));
-            if (pendingOps) this.pendingOperations = pendingOps;
+            if (addSet) this.addSet = new Map(JSON.parse(addSet));
+            if (removeSet) this.removeSet = new Map(JSON.parse(removeSet));
+            if (vectorClock) this.vectorClock = new Map(JSON.parse(vectorClock));
+            if (pending) this.pendingOperations = pending;
+            if (failed) this.failedOperations = failed;
+            
+            // Clean up old tombstones (> 7 days)
+            this.cleanupTombstones();
             
         } catch (error) {
             console.error('[CRDT] Failed to load state:', error);
+            // Initialize with empty state
+            this.addSet = new Map();
+            this.removeSet = new Map();
+            this.vectorClock = new Map();
+            this.pendingOperations = [];
+            this.failedOperations = [];
         }
     }
     
-    /**
-     * Persist CRDT state to IndexedDB
-     */
+    async getFromDB(db, storeName) {
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(['crdt'], 'readonly');
+            const store = tx.objectStore('crdt');
+            const request = store.get(storeName);
+            
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+    
     async persistState() {
         try {
             const db = await this.openIndexedDB();
             const tx = db.transaction(['crdt'], 'readwrite');
             const store = tx.objectStore('crdt');
             
-            await store.put(JSON.stringify(Array.from(this.addSet.entries())), 'addSet');
-            await store.put(JSON.stringify(Array.from(this.removeSet.entries())), 'removeSet');
-            await store.put(JSON.stringify(Array.from(this.vectorClock.entries())), 'vectorClock');
-            await store.put(this.pendingOperations, 'pendingOperations');
+            await Promise.all([
+                store.put(JSON.stringify(Array.from(this.addSet.entries())), 'addSet'),
+                store.put(JSON.stringify(Array.from(this.removeSet.entries())), 'removeSet'),
+                store.put(JSON.stringify(Array.from(this.vectorClock.entries())), 'vectorClock'),
+                store.put(this.pendingOperations, 'pendingOperations'),
+                store.put(this.failedOperations, 'failedOperations')
+            ]);
             
             await tx.done;
         } catch (error) {
@@ -104,12 +123,20 @@ class CRDTEngine {
         }
     }
     
-    /**
-     * Open IndexedDB connection
-     */
+    cleanupTombstones() {
+        const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+        
+        for (const [key, value] of this.removeSet.entries()) {
+            if (value.timestamp < sevenDaysAgo) {
+                this.removeSet.delete(key);
+                this.addSet.delete(key);
+            }
+        }
+    }
+    
     openIndexedDB() {
         return new Promise((resolve, reject) => {
-            const request = indexedDB.open('GETEDIL_CRDT', 1);
+            const request = indexedDB.open('GETEDIL_CRDT_v2', 2);
             
             request.onerror = () => reject(request.error);
             request.onsuccess = () => resolve(request.result);
@@ -117,444 +144,220 @@ class CRDTEngine {
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
                 if (!db.objectStoreNames.contains('crdt')) {
-                    db.createObjectStore('crdt');
+                    const store = db.createObjectStore('crdt');
+                    // Create indexes for better performance
+                    store.createIndex('timestamp', 'timestamp', { unique: false });
                 }
             };
         });
     }
     
-    /**
-     * Create a new transaction (Credit/Debit)
-     * @param {Object} transaction - Transaction details
-     * @returns {Promise<Object>} - CRDT operation result
-     */
     async createTransaction(transaction) {
+        // Rate limiting check
+        const now = Date.now();
+        if (now - this.lastRequestTime < this.minRequestInterval) {
+            await new Promise(resolve => setTimeout(resolve, this.minRequestInterval));
+        }
+        this.lastRequestTime = Date.now();
+        
         const operation = {
             id: this.generateOperationId(),
             clientId: this.clientId,
             timestamp: Date.now(),
             vectorClock: this.incrementVectorClock(),
-            type: transaction.type, // 'credit' or 'debit'
-            amount: transaction.amount,
+            type: transaction.type,
+            amount: Math.abs(transaction.amount),
             counterpartyId: transaction.counterpartyId,
             pillarId: transaction.pillarId,
             referenceId: transaction.referenceId,
             description: transaction.description,
-            metadata: transaction.metadata || {}
+            metadata: transaction.metadata || {},
+            retryCount: 0,
+            createdAt: Date.now()
         };
         
-        // Add to local addSet
+        // Validate balance locally first (optimistic)
+        if (operation.type === 'debit') {
+            const currentBalance = await this.getCurrentBalance();
+            if (currentBalance < operation.amount) {
+                throw new Error(`Insufficient balance: ${currentBalance} < ${operation.amount}`);
+            }
+        }
+        
+        // Add to local state
         this.addSet.set(operation.id, {
             value: operation,
             timestamp: operation.timestamp,
             clientId: this.clientId
         });
         
-        // Add to pending queue for sync
         this.pendingOperations.push(operation);
-        
-        // Persist locally
         await this.persistState();
         
-        // Try to sync immediately if online
+        // Try immediate sync if online
+        let syncResult = { success: false, queued: true };
         if (navigator.onLine) {
-            await this.sync();
+            syncResult = await this.syncNow([operation]);
         }
         
-        // Emit event
+        // Emit events
         if (this.eventBus) {
-            this.eventBus.emit('transaction:created', operation);
+            this.eventBus.emit('transaction:created', {
+                ...operation,
+                synced: syncResult.success,
+                queued: !syncResult.success
+            });
         }
         
         return {
             success: true,
             operationId: operation.id,
-            status: navigator.onLine ? 'syncing' : 'queued',
-            operation
+            status: syncResult.success ? 'completed' : 'queued',
+            operation,
+            syncError: syncResult.error
         };
     }
     
-    /**
-     * Generate unique operation ID
-     */
-    generateOperationId() {
-        return `${this.clientId}:${Date.now()}:${Math.random().toString(36).substr(2, 9)}`;
-    }
-    
-    /**
-     * Increment vector clock for this client
-     */
-    incrementVectorClock() {
-        const current = this.vectorClock.get(this.clientId) || 0;
-        const newClock = current + 1;
-        this.vectorClock.set(this.clientId, newClock);
-        
-        // Trim vector clock if too large
-        if (this.vectorClock.size > this.maxVectorSize) {
-            const oldest = Array.from(this.vectorClock.entries())
-                .sort((a, b) => a[1] - b[1])
-                .slice(0, Math.floor(this.maxVectorSize / 2));
-            oldest.forEach(([clientId]) => this.vectorClock.delete(clientId));
-        }
-        
-        return Object.fromEntries(this.vectorClock);
-    }
-    
-    /**
-     * Sync local operations with server
-     */
-    async sync() {
-        if (this.isSyncing || !navigator.onLine) {
-            console.log('[CRDT] Sync skipped: already syncing or offline');
-            return;
+    async syncNow(operations = null) {
+        if (this.isSyncing) {
+            return { success: false, error: 'Already syncing' };
         }
         
         this.isSyncing = true;
         
         try {
-            console.log(`[CRDT] Starting sync for ${this.pendingOperations.length} operations`);
-            
-            // Get server state
-            const serverState = await this.fetchServerState();
-            
-            // Merge remote operations
-            const conflicts = await this.mergeRemoteOperations(serverState.operations);
-            
-            // Resolve conflicts using LWW
-            const resolvedConflicts = await this.resolveConflicts(conflicts);
-            
-            // Push local operations to server
-            await this.pushLocalOperations();
-            
-            // Update local balance after sync
-            await this.updateLocalBalance();
-            
-            this.lastSyncTime = Date.now();
-            
-            // Emit sync complete event
-            if (this.eventBus) {
-                this.eventBus.emit('sync:complete', {
-                    operationsSynced: this.pendingOperations.length,
-                    conflictsResolved: resolvedConflicts.length,
-                    timestamp: this.lastSyncTime
-                });
+            const opsToSync = operations || this.pendingOperations;
+            if (opsToSync.length === 0) {
+                return { success: true, synced: 0 };
             }
             
-            // Clear pending operations that were successful
-            this.pendingOperations = [];
+            // Prepare batch for server
+            const batchOperations = opsToSync.map(op => ({
+                operation_id: op.id,
+                user_id: this.userId,
+                increment: op.type === 'credit' ? op.amount : -op.amount,
+                expected_version: null // Let server handle version check
+            }));
+            
+            // Call Supabase RPC with batch
+            const { data, error } = await this.supabase.rpc('batch_update_wallet_balance', {
+                p_operations: batchOperations
+            });
+            
+            if (error) throw error;
+            
+            // Process results
+            const successful = [];
+            const failed = [];
+            
+            for (const result of data) {
+                if (result.success) {
+                    successful.push(result.operation_id);
+                    // Update local balance
+                    await this.updateLocalBalance(result.new_balance);
+                } else {
+                    failed.push({
+                        operation_id: result.operation_id,
+                        error: result.error_message
+                    });
+                }
+            }
+            
+            // Remove successful operations from pending
+            this.pendingOperations = this.pendingOperations.filter(
+                op => !successful.includes(op.id)
+            );
+            
+            // Add failed to failed queue with retry tracking
+            for (const fail of failed) {
+                const op = this.pendingOperations.find(o => o.id === fail.operation_id);
+                if (op) {
+                    op.retryCount = (op.retryCount || 0) + 1;
+                    op.lastError = fail.error;
+                    op.lastRetryAt = Date.now();
+                    
+                    if (op.retryCount >= this.maxRetries) {
+                        this.failedOperations.push(op);
+                    } else {
+                        // Keep in pending for retry
+                        this.pendingOperations.push(op);
+                    }
+                }
+            }
+            
+            // Remove from pending if moved to failed
+            this.pendingOperations = this.pendingOperations.filter(
+                op => !failed.some(f => f.operation_id === op.id) || op.retryCount < this.maxRetries
+            );
+            
             await this.persistState();
+            
+            // Schedule retries for failed operations
+            if (this.pendingOperations.length > 0) {
+                setTimeout(() => this.sync(), this.retryDelay);
+            }
+            
+            return {
+                success: true,
+                synced: successful.length,
+                failed: failed.length,
+                errors: failed
+            };
             
         } catch (error) {
             console.error('[CRDT] Sync failed:', error);
-            
-            if (this.eventBus) {
-                this.eventBus.emit('sync:error', error);
-            }
+            return { success: false, error: error.message };
         } finally {
             this.isSyncing = false;
+            this.lastSyncTime = Date.now();
         }
     }
     
-    /**
-     * Fetch server state (transactions + vector clock)
-     */
-    async fetchServerState() {
-        if (!this.supabase) {
-            throw new Error('Supabase client not configured');
+    async sync() {
+        if (this.pendingOperations.length === 0) return;
+        await this.syncNow();
+    }
+    
+    generateOperationId() {
+        return `${this.clientId}:${Date.now()}:${Math.random().toString(36).substr(2, 9)}`;
+    }
+    
+    incrementVectorClock() {
+        const current = this.vectorClock.get(this.clientId) || 0;
+        const newClock = current + 1;
+        this.vectorClock.set(this.clientId, newClock);
+        
+        // Prune vector clock if too large
+        if (this.vectorClock.size > 100) {
+            const sorted = Array.from(this.vectorClock.entries())
+                .sort((a, b) => a[1] - b[1]);
+            const toKeep = sorted.slice(-50);
+            this.vectorClock.clear();
+            toKeep.forEach(([k, v]) => this.vectorClock.set(k, v));
         }
         
-        const { data, error } = await this.supabase
-            .from('wallet_transactions')
-            .select('*')
-            .eq('user_id', this.userId)
-            .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
-            .order('created_at', { ascending: false });
-        
-        if (error) throw error;
-        
-        // Get server vector clock
-        const { data: syncData } = await this.supabase
-            .from('sync_metadata')
-            .select('last_vector_clock')
-            .eq('client_id', this.clientId)
-            .eq('user_id', this.userId)
-            .single();
-        
-        return {
-            operations: data || [],
-            vectorClock: syncData?.last_vector_clock || {}
-        };
+        return Object.fromEntries(this.vectorClock);
     }
     
-    /**
-     * Merge remote operations with local state
-     */
-    async mergeRemoteOperations(remoteOperations) {
-        const conflicts = [];
-        
-        for (const remoteOp of remoteOperations) {
-            // Check if operation already exists locally
-            const localOp = this.addSet.get(remoteOp.operation_id);
-            
-            if (!localOp) {
-                // New operation, add to local state
-                this.addSet.set(remoteOp.operation_id, {
-                    value: remoteOp,
-                    timestamp: remoteOp.timestamp,
-                    clientId: remoteOp.client_id
-                });
-                
-                // Update vector clock
-                const remoteCounter = remoteOp.vector_clock[remoteOp.client_id] || 0;
-                const localCounter = this.vectorClock.get(remoteOp.client_id) || 0;
-                this.vectorClock.set(remoteOp.client_id, Math.max(remoteCounter, localCounter));
-                
-            } else if (this.hasConflict(localOp, remoteOp)) {
-                // Conflict detected
-                conflicts.push({
-                    local: localOp,
-                    remote: remoteOp
-                });
-            }
-        }
-        
-        await this.persistState();
-        return conflicts;
-    }
-    
-    /**
-     * Check if two operations conflict (LWW comparison)
-     */
-    hasConflict(localOp, remoteOp) {
-        // Same operation ID? No conflict (idempotent)
-        if (localOp.value.id === remoteOp.operation_id) return false;
-        
-        // Different operation types? No conflict
-        if (localOp.value.type !== remoteOp.type) return false;
-        
-        // Check if they affect the same balance (timestamp-based LWW)
-        const timeDiff = Math.abs(localOp.timestamp - remoteOp.timestamp);
-        
-        if (timeDiff <= this.clockSkewTolerance) {
-            // Within tolerance, check vector clock
-            const localPriority = this.compareVectorClocks(
-                localOp.value.vector_clock,
-                remoteOp.vector_clock
-            );
-            return localPriority === 0; // Equal priority = conflict
-        }
-        
-        return false;
-    }
-    
-    /**
-     * Compare two vector clocks
-     * @returns {number} 1 if a > b, -1 if a < b, 0 if concurrent
-     */
-    compareVectorClocks(clockA, clockB) {
-        let aGreater = false;
-        let bGreater = false;
-        
-        const allClients = new Set([...Object.keys(clockA), ...Object.keys(clockB)]);
-        
-        for (const client of allClients) {
-            const aVal = clockA[client] || 0;
-            const bVal = clockB[client] || 0;
-            
-            if (aVal > bVal) aGreater = true;
-            if (bVal > aVal) bGreater = true;
-        }
-        
-        if (aGreater && !bGreater) return 1;
-        if (!aGreater && bGreater) return -1;
-        return 0; // Concurrent
-    }
-    
-    /**
-     * Resolve conflicts using LWW (Last-Write-Wins)
-     */
-    async resolveConflicts(conflicts) {
-        const resolved = [];
-        
-        for (const conflict of conflicts) {
-            // Last-Write-Wins based on timestamp
-            const winner = conflict.local.timestamp > conflict.remote.timestamp
-                ? conflict.local
-                : conflict.remote;
-            
-            const loser = winner === conflict.local ? conflict.remote : conflict.local;
-            
-            // Mark loser as tombstone
-            this.removeSet.set(loser.value.id || loser.operation_id, {
-                timestamp: Date.now(),
-                clientId: this.clientId
-            });
-            
-            // Log conflict resolution
-            if (this.supabase) {
-                await this.supabase
-                    .from('wallet_transactions')
-                    .update({
-                        status: 'conflict',
-                        conflict_resolution: `LWW resolved: ${winner.timestamp} > ${loser.timestamp}`,
-                        reconciled_at: new Date().toISOString()
-                    })
-                    .eq('operation_id', loser.value.id || loser.operation_id);
-            }
-            
-            resolved.push({
-                winner: winner.value,
-                loser: loser.value,
-                resolution: 'LWW'
-            });
-            
-            // Emit conflict event for UI notification
-            if (this.eventBus) {
-                this.eventBus.emit('transaction:conflict', {
-                    winner: winner.value,
-                    loser: loser.value
-                });
-            }
-        }
-        
-        await this.persistState();
-        return resolved;
-    }
-    
-    /**
-     * Push local operations to server
-     */
-    async pushLocalOperations() {
-        if (!this.supabase || this.pendingOperations.length === 0) return;
-        
-        for (const operation of this.pendingOperations) {
-            try {
-                // Check if already exists on server
-                const { data: existing } = await this.supabase
-                    .from('wallet_transactions')
-                    .select('id')
-                    .eq('operation_id', operation.id)
-                    .single();
-                
-                if (existing) {
-                    // Already exists, remove from pending
-                    continue;
-                }
-                
-                // Insert transaction
-                const { error } = await this.supabase
-                    .from('wallet_transactions')
-                    .insert({
-                        transaction_id: operation.id,
-                        user_id: this.userId,
-                        amount: operation.amount,
-                        type: operation.type,
-                        status: 'completed',
-                        client_id: operation.clientId,
-                        timestamp: operation.timestamp,
-                        vector_clock: operation.vectorClock,
-                        operation_id: operation.id,
-                        counterparty_id: operation.counterpartyId,
-                        pillar_id: operation.pillarId,
-                        reference_id: operation.referenceId,
-                        description: operation.description,
-                        metadata: operation.metadata
-                    });
-                
-                if (error) throw error;
-                
-                // Update wallet balance on server
-                await this.updateServerBalance(operation);
-                
-            } catch (error) {
-                console.error(`[CRDT] Failed to push operation ${operation.id}:`, error);
-                // Keep in pending for retry
-                throw error;
-            }
-        }
-    }
-    
-    /**
-     * Update server balance
-     */
-    async updateServerBalance(operation) {
-        const increment = operation.type === 'credit' ? operation.amount : -operation.amount;
-        
-        const { error } = await this.supabase.rpc('update_wallet_balance', {
-            p_user_id: this.userId,
-            p_increment: increment,
-            p_operation_id: operation.id
-        });
-        
-        if (error) throw error;
-    }
-    
-    /**
-     * Update local balance after sync
-     */
-    async updateLocalBalance() {
-        const { data, error } = await this.supabase
-            .from('wallets')
-            .select('balance')
-            .eq('user_id', this.userId)
-            .single();
-        
-        if (!error && data) {
-            // Update local store via event
-            if (this.eventBus) {
-                this.eventBus.emit('wallet:updated', { balance: data.balance });
-            }
-        }
-    }
-    
-    /**
-     * Handle offline mode
-     */
-    handleOffline() {
-        console.log('[CRDT] Entered offline mode');
-        
+    async updateLocalBalance(newBalance) {
         if (this.eventBus) {
-            this.eventBus.emit('sync:offline', {
-                pendingOperations: this.pendingOperations.length,
-                timestamp: Date.now()
+            this.eventBus.emit('wallet:updated', { 
+                balance: newBalance,
+                timestamp: Date.now(),
+                source: 'sync'
             });
+        }
+        
+        // Also update any local store (Zustand, Redux, etc)
+        if (window.__GETEDIL_STORE__) {
+            window.__GETEDIL_STORE__.setState({ walletBalance: newBalance });
         }
     }
     
-    /**
-     * Start automatic background sync
-     */
-    startAutoSync() {
-        setInterval(() => {
-            if (navigator.onLine && this.pendingOperations.length > 0) {
-                this.sync();
-            }
-        }, this.syncInterval);
-    }
-    
-    /**
-     * Get current sync status
-     */
-    getSyncStatus() {
-        return {
-            isSyncing: this.isSyncing,
-            pendingOperations: this.pendingOperations.length,
-            conflicts: this.conflictQueue.length,
-            lastSyncTime: this.lastSyncTime,
-            clientId: this.clientId,
-            vectorClockSize: this.vectorClock.size
-        };
-    }
-    
-    /**
-     * Get current balance from CRDT state
-     */
     async getCurrentBalance() {
-        // Calculate balance from all operations
         let balance = 0;
         
         for (const [_, op] of this.addSet) {
-            // Skip tombstones
             if (this.removeSet.has(op.value.id)) continue;
             
             if (op.value.type === 'credit') {
@@ -564,67 +367,98 @@ class CRDTEngine {
             }
         }
         
+        // Also check server balance if online and recently synced
+        if (navigator.onLine && (Date.now() - (this.lastSyncTime || 0)) < 60000) {
+            try {
+                const { data } = await this.supabase
+                    .from('wallets')
+                    .select('balance')
+                    .eq('user_id', this.userId)
+                    .single();
+                
+                if (data) {
+                    balance = Math.max(balance, data.balance);
+                }
+            } catch (error) {
+                console.warn('[CRDT] Failed to fetch server balance:', error);
+            }
+        }
+        
         return Math.max(0, balance);
     }
     
-    /**
-     * Retry failed operations
-     */
     async retryFailedOperations() {
-        const failedOps = this.pendingOperations.filter(op => op.failed);
+        if (this.failedOperations.length === 0) return;
         
-        for (const op of failedOps) {
-            op.failed = false;
-            await this.createTransaction(op);
+        // Reset retry count and move back to pending
+        for (const op of this.failedOperations) {
+            op.retryCount = 0;
+            op.lastError = null;
+            this.pendingOperations.push(op);
         }
         
+        this.failedOperations = [];
+        await this.persistState();
         await this.sync();
     }
     
-    /**
-     * Clear local state (logout)
-     */
+    async getPendingCount() {
+        return {
+            pending: this.pendingOperations.length,
+            failed: this.failedOperations.length,
+            total: this.pendingOperations.length + this.failedOperations.length
+        };
+    }
+    
+    handleOffline() {
+        if (this.eventBus) {
+            this.eventBus.emit('sync:offline', {
+                pendingOperations: this.pendingOperations.length,
+                timestamp: Date.now()
+            });
+        }
+    }
+    
+    startAutoSync() {
+        setInterval(() => {
+            if (navigator.onLine && this.pendingOperations.length > 0 && !this.isSyncing) {
+                this.sync();
+            }
+        }, this.syncInterval);
+    }
+    
+    async healthCheck() {
+        const status = {
+            clientId: this.clientId,
+            isSyncing: this.isSyncing,
+            pendingCount: this.pendingOperations.length,
+            failedCount: this.failedOperations.length,
+            lastSyncTime: this.lastSyncTime,
+            vectorClockSize: this.vectorClock.size,
+            addSetSize: this.addSet.size,
+            removeSetSize: this.removeSet.size,
+            isOnline: navigator.onLine
+        };
+        
+        console.log('[CRDT] Health check:', status);
+        
+        if (this.eventBus) {
+            this.eventBus.emit('sync:health', status);
+        }
+        
+        return status;
+    }
+    
     async clearState() {
         this.addSet.clear();
         this.removeSet.clear();
         this.vectorClock.clear();
         this.pendingOperations = [];
-        this.conflictQueue = [];
+        this.failedOperations = [];
         
         await this.persistState();
-        
         console.log('[CRDT] State cleared');
     }
 }
 
-// Export for use in React components
 export default CRDTEngine;
-
-// Usage Example:
-/*
-import CRDTEngine from '@/lib/sync-engine/crdt-engine';
-import { supabase } from '@/lib/supabase';
-import { eventBus } from '@/lib/event-bus';
-
-const crdtEngine = new CRDTEngine({
-    clientId: localStorage.getItem('device_id'),
-    userId: user.id,
-    supabase: supabase,
-    eventBus: eventBus,
-    syncInterval: 30000
-});
-
-// Create a transaction
-await crdtEngine.createTransaction({
-    type: 'debit',
-    amount: 500,
-    counterpartyId: 'merchant_123',
-    pillarId: 'P6_GetPaid',
-    referenceId: 'order_456',
-    description: 'Coffee purchase'
-});
-
-// Check sync status
-const status = crdtEngine.getSyncStatus();
-console.log(`Pending: ${status.pendingOperations}`);
-*/
