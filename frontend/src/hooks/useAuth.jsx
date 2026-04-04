@@ -5,7 +5,7 @@
 // Integrates Supabase profiles table and Registry.js permissions
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '../lib/supabase';
 import { ROLE_LEVELS } from '@/core/Registry';
 
 const AuthContext = createContext(null);
