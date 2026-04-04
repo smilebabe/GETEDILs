@@ -1,29 +1,19 @@
+import React from 'react';
 import CourseCard from './CourseCard';
 
-export default function CourseGallery({ courses = [] }) {
+const CourseGallery = ({ courses }) => {
   return (
-    <div className="w-full px-3 py-4">
-      
-      {/* Title */}
-      <h2 className="text-white text-lg font-semibold mb-4 tracking-wide">
-        🎓 Explore Skills
-      </h2>
-
-      {/* Grid */}
-      <div
-        className="
-          grid
-          grid-cols-2
-          gap-3
-          sm:grid-cols-2
-          md:grid-cols-3
-        "
-      >
-        {courses.map((course) => (
-          <CourseCard key={course.id} course={course} />
-        ))}
-      </div>
-
+    <div className="p-4 md:p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+      {courses.map((course, index) => (
+        <CourseCard
+          key={index}
+          title={course.title}
+          instructor={course.instructor}
+          price={course.price}
+        />
+      ))}
     </div>
   );
-}
+};
+
+export default CourseGallery;
