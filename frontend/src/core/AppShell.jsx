@@ -1,5 +1,8 @@
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
+import GETEPanel from '@/components/gete/GETEPanel';
+import GETEButton from '@/components/gete/GETEButton';
+import { useGETEStore } from '@/store/geteStore';
 
 import { REGISTRY } from './Registry';
 import { injectTheme } from './initTheme';
@@ -16,7 +19,7 @@ export default function AppShell() {
     openPillar,
     closeOverlay
   } = usePillarNavigation();
-
+const setContext = useGETEStore((s) => s.setContext)
   // 🎨 Inject theme once
   useEffect(() => {
     injectTheme();
@@ -68,3 +71,5 @@ export default function AppShell() {
     </div>
   );
 }
+<GETEPanel />
+<GETEButton />
