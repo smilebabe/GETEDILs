@@ -2,10 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { Terminal, Globe, Zap, ShieldCheck, Briefcase, Plus } from 'lucide-react';
 
-// --- MODULAR IMPORTS (ChatGPT Standard) ---
+// --- MODULAR IMPORTS ---
 import AuthPortal from './components/auth/AuthPortal';
 import WalletBalance from './components/wallet/WalletBalance';
 import PillarOverlay from './components/navigation/PillarOverlay';
+import GETEPanel from './components/gete/GETEPanel';
+import GETEButton from './components/gete/GETEButton';
+import { useGETEStore } from './store/geteStore';
 
 // Initialize Supabase
 const supabase = createClient(
@@ -20,15 +23,16 @@ export default function App() {
   const [balance, setBalance] = useState("0.00");
   const [activePillar, setActivePillar] = useState(null);
 
+  // --- GETE BRAIN STATE ---
+  const setContext = useGETEStore((s) => s.setContext);
+
   // --- AUTHENTICATION LOGIC ---
   useEffect(() => {
-    // Check initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
     });
 
-    // Listen for login/logout events
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
@@ -40,7 +44,6 @@ export default function App() {
   useEffect(() => {
     if (!session) return;
 
-    // 1. Initial Fetch
     const fetchBalance = async () => {
       const { data, error } = await supabase
         .from('wallets')
@@ -54,7 +57,6 @@ export default function App() {
 
     fetchBalance();
 
-    // 2. Real-time Subscription
     const walletChannel = supabase.channel('realtime_wallet')
       .on('postgres_changes', 
         { event: 'UPDATE', schema: 'public', table: 'wallets', filter: `user_id=eq.${session.user.id}` }, 
@@ -67,11 +69,16 @@ export default function App() {
     return () => supabase.removeChannel(walletChannel);
   }, [session]);
 
-  // --- AUTH HANDLERS ---
+  // --- HANDLERS ---
   const handleLogin = () => supabase.auth.signInWithOAuth({ provider: 'google' });
   const handleLogout = () => supabase.auth.signOut();
 
-  // --- RENDER LOGIC ---
+  // --- NAVIGATION & AI CONTEXT ---
+  const openPillar = (name) => {
+    setActivePillar(name);
+    setContext(name); // Updates GETE's brain on which pillar is active
+  };
+
   if (loading) return (
     <div className="h-screen w-full bg-black flex items-center justify-center">
       <div className="text-yellow-500 font-black tracking-[0.5em] animate-pulse">INITIALIZING_OS...</div>
@@ -87,7 +94,10 @@ export default function App() {
       <PillarOverlay 
         isOpen={!!activePillar} 
         title={activePillar} 
-        onClose={() => setActivePillar(null)} 
+        onClose={() => {
+            setActivePillar(null);
+            setContext(null); // Reset AI context on close
+        }} 
       />
 
       {/* 2. BACKGROUND VISUALS */}
@@ -137,10 +147,10 @@ export default function App() {
 
           {/* SERVICE PILLAR NODES */}
           <nav className="grid grid-cols-2 gap-8">
-            <ServiceNode name="Real Estate" icon={<Globe />} onClick={() => setActivePillar("Real Estate")} />
-            <ServiceNode name="Logistics" icon={<Zap />} onClick={() => setActivePillar("Logistics")} />
-            <ServiceNode name="Police DB" icon={<ShieldCheck />} onClick={() => setActivePillar("Federal Police")} />
-            <ServiceNode name="Consulting" icon={<Briefcase />} onClick={() => setActivePillar("Consultancy")} />
+            <ServiceNode name="Real Estate" icon={<Globe />} onClick={() => openPillar("Real Estate")} />
+            <ServiceNode name="Logistics" icon={<Zap />} onClick={() => openPillar("Logistics")} />
+            <ServiceNode name="Police DB" icon={<ShieldCheck />} onClick={() => openPillar("Federal Police")} />
+            <ServiceNode name="Consulting" icon={<Briefcase />} onClick={() => openPillar("Consultancy")} />
           </nav>
         </main>
 
@@ -153,6 +163,12 @@ export default function App() {
           </div>
         </footer>
       </div>
+
+      {/* --- 6. NEURAL LAYER (GETE AI) --- */}
+      {/* This is what adds the AI Button and Panel to your screen */}
+      <GETEPanel />
+      <GETEButton />
+
     </div>
   );
 }
