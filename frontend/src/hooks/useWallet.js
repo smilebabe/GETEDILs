@@ -1,5 +1,5 @@
 // frontend/src/hooks/useWallet.js
-import { useEffect, useState } from 'react';
+import { supabase } from '../lib';
 import { useAuth } from './useAuth';
 import { supabase } from '@/lib/supabase';
 import { eventBus } from '@/lib/event-bus';
