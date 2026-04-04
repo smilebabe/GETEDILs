@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
 import { parseIntent } from '@/core/voice-intent-parser';
 import { useAgenticRouter } from '@/core/AgenticRouter';
+import { useGETEStore } from '@/store/geteStore';
 
 export default function useVoiceIntent() {
   const { routeTo } = useAgenticRouter();
+  const addMessage = useGETEStore((s) => s.addMessage);
 
   useEffect(() => {
     const SpeechRecognition =
@@ -17,6 +19,8 @@ export default function useVoiceIntent() {
     recognition.onresult = (event) => {
       const text =
         event.results[event.results.length - 1][0].transcript;
+
+      addMessage({ role: 'user', text });
 
       const intent = parseIntent(text);
 
