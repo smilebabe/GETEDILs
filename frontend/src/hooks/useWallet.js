@@ -1,8 +1,14 @@
-// frontend/src/hooks/useWallet.js
-import { supabase } from '../lib';
+/**
+ * GETEDIL-OS Wallet Hook
+ * Optimized for CRDT Sync & Vercel Build Compatibility
+ */
+
+import { useState, useEffect, useCallback } from 'react';
+import { supabase, eventBus } from '../lib';
 import { useAuth } from './useAuth';
-import { supabase } from '@/lib/supabase';
-import { eventBus } from '@/lib/event-bus';
+
+// Use a relative path for the CRDT engine to avoid alias resolution errors
+import CRDTEngineClass from '../lib/sync-engine/crdt-engine';
 
 let crdtEngine = null;
 
@@ -13,14 +19,27 @@ export function useWallet() {
     const [isSyncing, setIsSyncing] = useState(false);
     const [error, setError] = useState(null);
     
+    // Wrapped in useCallback to prevent unnecessary re-renders in other hooks
+    const loadBalance = useCallback(async () => {
+        if (!crdtEngine) return;
+        try {
+            const currentBalance = await crdtEngine.getCurrentBalance();
+            setBalance(currentBalance);
+            
+            const pending = await crdtEngine.getPendingCount();
+            setPendingOperations(pending.pending);
+        } catch (err) {
+            console.error("Balance Load Error:", err);
+        }
+    }, []);
+
     useEffect(() => {
         if (!user) return;
         
-        // Initialize CRDT engine once
+        // Initialize CRDT engine once using a stable singleton pattern
         if (!crdtEngine) {
-            const CRDTEngineClass = require('@/lib/sync-engine/crdt-engine').default;
             crdtEngine = new CRDTEngineClass({
-                clientId: localStorage.getItem('device_id'),
+                clientId: localStorage.getItem('device_id') || 'browser_client',
                 userId: user.id,
                 supabase: supabase,
                 eventBus: eventBus,
@@ -28,15 +47,14 @@ export function useWallet() {
             });
         }
         
-        // Load initial balance
         loadBalance();
         
-        // Subscribe to events
+        // Subscribe to events via EventBus
         const unsubscribeBalance = eventBus.on('wallet:updated', ({ balance }) => {
             setBalance(balance);
         });
         
-        const unsubscribeSync = eventBus.on('sync:complete', (data) => {
+        const unsubscribeSync = eventBus.on('sync:complete', () => {
             setIsSyncing(false);
             setPendingOperations(0);
         });
@@ -47,23 +65,15 @@ export function useWallet() {
         });
         
         return () => {
-            unsubscribeBalance();
-            unsubscribeSync();
-            unsubscribeHealth();
+            if (unsubscribeBalance) unsubscribeBalance();
+            if (unsubscribeSync) unsubscribeSync();
+            if (unsubscribeHealth) unsubscribeHealth();
         };
-    }, [user]);
-    
-    const loadBalance = async () => {
-        if (!crdtEngine) return;
-        const currentBalance = await crdtEngine.getCurrentBalance();
-        setBalance(currentBalance);
-        
-        const pending = await crdtEngine.getPendingCount();
-        setPendingOperations(pending.pending);
-    };
+    }, [user, loadBalance]);
     
     const sendMoney = async (amount, toUserId, metadata = {}) => {
         setError(null);
+        if (!crdtEngine) return { success: false, message: 'Engine not ready' };
         
         try {
             const result = await crdtEngine.createTransaction({
@@ -76,13 +86,9 @@ export function useWallet() {
                 metadata
             });
             
-            if (!result.success) {
-                throw new Error('Transaction failed');
-            }
+            if (!result.success) throw new Error('Transaction failed');
             
-            // Refresh balance
             await loadBalance();
-            
             return result;
         } catch (err) {
             setError(err.message);
@@ -92,7 +98,8 @@ export function useWallet() {
     
     const receiveMoney = async (amount, fromUserId, metadata = {}) => {
         setError(null);
-        
+        if (!crdtEngine) return { success: false, message: 'Engine not ready' };
+
         try {
             const result = await crdtEngine.createTransaction({
                 type: 'credit',
