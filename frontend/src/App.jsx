@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { Terminal, Globe, Zap, ShieldCheck, Briefcase, Plus } from 'lucide-react';
+import { Terminal, Globe, Zap, ShieldCheck, Briefcase, Plus, BookOpen } from 'lucide-react'; // Added BookOpen
 
 // --- MODULAR IMPORTS ---
 import AuthPortal from './components/auth/AuthPortal';
@@ -9,6 +9,9 @@ import PillarOverlay from './components/navigation/PillarOverlay';
 import GETEPanel from './components/gete/GETEPanel';
 import GETEButton from './components/gete/GETEButton';
 import { useGETEStore } from './store/geteStore';
+
+// --- NEW PILLAR IMPORT ---
+import GetSkillPillar from './pillars/getskill/GetSkillPillar';
 
 // Initialize Supabase
 const supabase = createClient(
@@ -76,7 +79,20 @@ export default function App() {
   // --- NAVIGATION & AI CONTEXT ---
   const openPillar = (name) => {
     setActivePillar(name);
-    setContext(name); // Updates GETE's brain on which pillar is active
+    setContext(name); 
+  };
+
+  // --- PILLAR CONTENT RESOLVER ---
+  // This maps the pillar name to the actual component logic
+  const renderPillarContent = () => {
+    switch (activePillar) {
+      case "GetSkill":
+        return <GetSkillPillar />;
+      // Placeholders for future pillars
+      case "Real Estate": return <div className="p-10 text-zinc-500">Real Estate Module Initializing...</div>;
+      case "Logistics": return <div className="p-10 text-zinc-500">Logistics Module Initializing...</div>;
+      default: return null;
+    }
   };
 
   if (loading) return (
@@ -96,9 +112,12 @@ export default function App() {
         title={activePillar} 
         onClose={() => {
             setActivePillar(null);
-            setContext(null); // Reset AI context on close
+            setContext(null); 
         }} 
-      />
+      >
+        {/* We pass the dynamic content into the overlay */}
+        {renderPillarContent()}
+      </PillarOverlay>
 
       {/* 2. BACKGROUND VISUALS */}
       <div className="absolute inset-0 pointer-events-none opacity-20">
@@ -147,10 +166,11 @@ export default function App() {
 
           {/* SERVICE PILLAR NODES */}
           <nav className="grid grid-cols-2 gap-8">
+            {/* UPDATED: Added GetSkill and swapped names */}
+            <ServiceNode name="GetSkill" icon={<BookOpen />} onClick={() => openPillar("GetSkill")} />
             <ServiceNode name="Real Estate" icon={<Globe />} onClick={() => openPillar("Real Estate")} />
             <ServiceNode name="Logistics" icon={<Zap />} onClick={() => openPillar("Logistics")} />
             <ServiceNode name="Police DB" icon={<ShieldCheck />} onClick={() => openPillar("Federal Police")} />
-            <ServiceNode name="Consulting" icon={<Briefcase />} onClick={() => openPillar("Consultancy")} />
           </nav>
         </main>
 
@@ -164,8 +184,6 @@ export default function App() {
         </footer>
       </div>
 
-      {/* --- 6. NEURAL LAYER (GETE AI) --- */}
-      {/* This is what adds the AI Button and Panel to your screen */}
       <GETEPanel />
       <GETEButton />
 
@@ -173,7 +191,6 @@ export default function App() {
   );
 }
 
-// --- SUB-COMPONENT: SERVICE NODE ---
 function ServiceNode({ name, icon, onClick }) {
   return (
     <div 
