@@ -1,15 +1,27 @@
 export const getSuggestion = (context) => {
-  switch (context) {
+  // Normalize context for safety
+  const ctx = context?.trim();
+
+  switch (ctx) {
     case 'Get Hired':
-      return 'Want me to find jobs or optimize your CV?';
+    case 'Sira':
+      return 'Ready to optimize your CV or search the Addis job market?';
 
     case 'Real Estate':
-      return 'Looking to buy, rent, or list a property?';
+    case 'Bet':
+      return 'Looking for a verified listing in Bole or a rental nearby?';
 
     case 'Logistics':
-      return 'Track delivery or request transport?';
+    case 'Izig':
+      return 'Need to track a delivery or calculate cross-city transport?';
+
+    case 'Federal Police':
+      return 'Enter a name or ID to run a background trust-level check.';
+
+    case 'Consultancy':
+      return 'How can I assist with your business architecture today?';
 
     default:
-      return 'How can I assist you today?';
+      return 'Awaiting your command. How can I assist you today?';
   }
 };
