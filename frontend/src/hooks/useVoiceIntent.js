@@ -1,84 +1,30 @@
-// ============================================
-// frontend/src/hooks/useVoiceIntent.js
-// ============================================
-// Web Speech API hook → parses intent → routes via AgenticRouter
+import { useEffect } from 'react';
+import { parseIntent } from '@/core/voice-intent-parser';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { parseVoiceIntent } from '@/core/voice-intent-parser';
-import { AgenticRouter } from '@/core/AgenticRouter';
-
-const SpeechRecognition =
-  typeof window !== 'undefined' &&
-  (window.SpeechRecognition || window.webkitSpeechRecognition);
-
-export const useVoiceIntent = () => {
-  const recognitionRef = useRef(null);
-  const [listening, setListening] = useState(false);
-  const [transcript, setTranscript] = useState('');
-  const [error, setError] = useState(null);
-
-  // Initialize
+export default function useVoiceIntent(openPillar) {
   useEffect(() => {
-    if (!SpeechRecognition) {
-      setError('SpeechRecognition not supported');
-      return;
-    }
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) return;
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.lang = 'en-US'; // You can extend to am-ET later
-
-    recognition.onstart = () => setListening(true);
-    recognition.onend = () => setListening(false);
-
-    recognition.onerror = (e) => {
-      setError(e.error);
-      setListening(false);
-    };
+    recognition.continuous = true;
+    recognition.lang = 'en-US';
 
     recognition.onresult = (event) => {
-      const text = event.results[0][0].transcript.trim();
-      setTranscript(text);
+      const text =
+        event.results[event.results.length - 1][0].transcript;
 
-      // Normalize
-      const normalized = text.toLowerCase();
+      const intent = parseIntent(text);
 
-      // Hard fallback mapping (critical commands)
-      if (normalized.includes('sira') || normalized.includes('job')) {
-        AgenticRouter.navigate('/get-hired');
-        return;
-      }
-
-      // Parse via AI/logic layer
-      const pillarId = parseVoiceIntent(text);
-
-      if (pillarId) {
-        AgenticRouter.navigateByPillar(pillarId);
-      } else {
-        console.warn('No intent matched for:', text);
+      if (intent?.pillar) {
+        openPillar(intent.pillar);
       }
     };
 
-    recognitionRef.current = recognition;
-  }, []);
+    recognition.start();
 
-  const startListening = useCallback(() => {
-    if (!recognitionRef.current) return;
-    setError(null);
-    recognitionRef.current.start();
-  }, []);
-
-  const stopListening = useCallback(() => {
-    if (!recognitionRef.current) return;
-    recognitionRef.current.stop();
-  }, []);
-
-  return {
-    listening,
-    transcript,
-    error,
-    startListening,
-    stopListening
-  };
-};
+    return () => recognition.stop();
+  }, [openPillar]);
+}
