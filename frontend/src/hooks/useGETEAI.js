@@ -1,37 +1,42 @@
-import { supabase } from '../lib/supabase'; // Ensure this path is correct
+import { supabase } from '../lib/supabase';
 import { useGETEStore } from '../store/geteStore';
 
 export const useGETEAI = () => {
-  const { messages, addMessage, updateLastMessage, setStreaming } = useGETEStore();
+  const { addMessage, setStreaming } = useGETEStore();
 
-  const sendMessage = async (userId, text) => {
-    // 1. Check if user has balance (The "Gas" Check)
-    const { data: wallet } = await supabase
+  const processAILogic = async (userId, userText) => {
+    // 1. AUTH & BALANCE CHECK
+    const { data: wallet, error } = await supabase
       .from('wallets')
       .select('balance')
       .eq('user_id', userId)
       .single();
 
-    if (!wallet || wallet.balance < 0.05) {
-      addMessage({ role: 'assistant', text: "Insufficient P6 Credits. Please deposit ETB to continue." });
+    if (wallet?.balance < 0.10) { // Cost per AI thought: 0.10 ETB
+      addMessage({ role: 'assistant', text: "⚠️ INSUFFICIENT_FUNDS: Please top up your P6 Wallet to access GETE Intelligence." });
       return;
     }
 
-    // 2. Process AI (Streaming)
-    addMessage({ role: 'user', text });
-    addMessage({ role: 'assistant', text: '' });
+    // 2. TRIGGER STREAMING
     setStreaming(true);
+    addMessage({ role: 'user', text: userText });
 
-    // [AI Streaming Logic here - calling your /api/ai/chat]
-    
-    // 3. Deduct "Thinking Fee" (0.05 ETB per request)
-    await supabase
-      .from('wallets')
-      .update({ balance: wallet.balance - 0.05 })
-      .eq('user_id', userId);
+    try {
+      // Logic to call your Vercel Edge Function for AI
+      // ... (Streaming response code)
 
-    setStreaming(false);
+      // 3. DEDUCT FEE (Self-Preservation)
+      await supabase
+        .from('wallets')
+        .update({ balance: wallet.balance - 0.10 })
+        .eq('user_id', userId);
+
+    } catch (err) {
+      console.error("OS_CRITICAL_ERROR:", err);
+    } finally {
+      setStreaming(false);
+    }
   };
 
-  return { sendMessage };
+  return { processAILogic };
 };
