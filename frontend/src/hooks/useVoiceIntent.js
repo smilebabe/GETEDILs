@@ -1,7 +1,10 @@
 import { useEffect } from 'react';
 import { parseIntent } from '@/core/voice-intent-parser';
+import { useAgenticRouter } from '@/core/AgenticRouter';
 
-export default function useVoiceIntent(openPillar) {
+export default function useVoiceIntent() {
+  const { routeTo } = useAgenticRouter();
+
   useEffect(() => {
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -10,7 +13,6 @@ export default function useVoiceIntent(openPillar) {
 
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
-    recognition.lang = 'en-US';
 
     recognition.onresult = (event) => {
       const text =
@@ -18,13 +20,13 @@ export default function useVoiceIntent(openPillar) {
 
       const intent = parseIntent(text);
 
-      if (intent?.pillar) {
-        openPillar(intent.pillar);
+      if (intent?.path) {
+        routeTo(intent.path);
       }
     };
 
     recognition.start();
 
     return () => recognition.stop();
-  }, [openPillar]);
+  }, []);
 }
