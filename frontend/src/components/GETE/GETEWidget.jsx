@@ -188,3 +188,19 @@ const GETEWidget = ({ onExpand, suggestions, unreadAlerts }) => {
                 {isHovered && !isMinimized && (
                     <motion.div
                         initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute -top-6 left-1/2 transform -translate-x-1/2 whitespace-nowrap bg-black/80 backdrop-blur-sm rounded-full px-2 py-0.5 text-xs text-slate-400"
+                    >
+                        Drag to move
+                    </motion.div>
+                )}
+            </AnimatePresence>
+            
+            {/* Ethiopian Flag Accent */}
+            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 opacity-75" />
+        </motion.div>
+    );
+};
+
+export default GETEWidget;
