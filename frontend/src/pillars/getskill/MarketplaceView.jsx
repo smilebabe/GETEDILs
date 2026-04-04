@@ -1,86 +1,73 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import CourseGallery from './CourseGallery';
-import { useEnrollment } from '../hooks/useEnrollment';
 
-const fetchCourses = async () => {
-  // Replace with real API call
-  return [
-    { title: 'React Basics', instructor: 'Amanuel', price: 500, category: 'Programming', is_published: true },
-    { title: 'Marketing 101', instructor: 'Sara', price: 300, category: 'Marketing', is_published: true },
-    { title: 'Node.js Advanced', instructor: 'Getachew', price: 700, category: 'Programming', is_published: true },
-    { title: 'Social Media Growth', instructor: 'Lily', price: 400, category: 'Marketing', is_published: true },
-  ];
-};
+const CATEGORY_OPTIONS = ['All', 'Programming', 'Marketing', 'Design', 'Finance', 'Productivity'];
 
-const CATEGORY_OPTIONS = ['All', 'Programming', 'Marketing', 'Design', 'Finance'];
-
-const MarketplaceView = () => {
-  const [courses, setCourses] = useState([]);
+const MarketplaceView = ({ courses, isLoading, onEnroll, filters, onFilterChange }) => {
   const [search, setSearch] = useState('');
-  const [activeCategory, setActiveCategory] = useState('All');
-  const { enroll } = useEnrollment();
 
-  useEffect(() => {
-    const loadCourses = async () => {
-      const data = await fetchCourses();
-      setCourses(data.filter(c => c.is_published));
-    };
-    loadCourses();
-  }, []);
-
+  // Local UI-side search for instant feedback
   const filteredCourses = useMemo(() => {
-    return courses.filter(c => {
-      const matchesCategory = activeCategory === 'All' || c.category === activeCategory;
-      const matchesSearch = c.title.toLowerCase().includes(search.toLowerCase());
-      return matchesCategory && matchesSearch;
+    return (courses || []).filter(c => {
+      const matchesSearch = c.title.toLowerCase().includes(search.toLowerCase()) || 
+                            c.instructor?.toLowerCase().includes(search.toLowerCase());
+      return matchesSearch;
     });
-  }, [courses, search, activeCategory]);
+  }, [courses, search]);
 
   return (
-    <div className="flex flex-col h-full w-full p-4 md:p-6 bg-[#0a0a0a] text-white font-sans">
+    <div className="flex flex-col h-full w-full text-white font-sans pb-12">
       
-      {/* Search Input with Holographic Glow */}
-      <motion.div
-        whileFocus={{ boxShadow: '0 0 20px #EAB308, 0 0 40px #EAB308/50' }}
-        className="mb-4"
-      >
+      {/* 🔮 Search Input with Glow */}
+      <motion.div className="mb-6 px-1">
         <input
           type="text"
-          placeholder="Search courses..."
+          placeholder="Search neural modules..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full bg-white/5 border border-[#EAB308] rounded-lg py-2 px-4 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#EAB308]/50 transition-all"
+          className="w-full bg-white/5 border border-yellow-500/30 rounded-2xl py-3.5 px-5 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-yellow-500/40 focus:border-yellow-500/60 transition-all text-sm shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]"
         />
       </motion.div>
 
-      {/* Category Filter Bar with Glow */}
-      <div className="flex overflow-x-auto space-x-4 mb-6 py-2">
+      {/* 🏷️ Category Filter Bar */}
+      <div className="flex overflow-x-auto space-x-3 mb-8 py-2 no-scrollbar scroll-smooth">
         {CATEGORY_OPTIONS.map((cat) => (
           <motion.button
             key={cat}
-            onClick={() => setActiveCategory(cat)}
-            whileHover={{ scale: 1.1, boxShadow: '0 0 12px #EAB308, 0 0 24px #EAB308/50' }}
+            whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className={`flex-shrink-0 px-4 py-2 rounded-full font-semibold transition-all ${
-              activeCategory === cat
-                ? 'bg-[#EAB308] text-black shadow-lg'
-                : 'bg-white/5 text-slate-300 hover:bg-white/10'
+            onClick={() => onFilterChange({ ...filters, category: cat.toLowerCase() })}
+            className={`flex-shrink-0 px-6 py-2 rounded-full text-[10px] font-black tracking-widest transition-all border ${
+              filters.category === cat.toLowerCase() || (cat === 'All' && filters.category === 'all')
+                ? 'bg-yellow-500 text-black border-yellow-500 shadow-[0_0_25px_rgba(234,179,8,0.4)]'
+                : 'bg-white/5 text-zinc-500 border-white/10 hover:border-white/20'
             }`}
           >
-            {cat}
+            {cat.toUpperCase()}
           </motion.button>
         ))}
       </div>
 
-      {/* Course Gallery */}
-      <div className="flex-1 overflow-y-auto">
-        <CourseGallery
-          courses={filteredCourses.map(c => ({
-            ...c,
-            enroll: () => enroll(c),
-          }))}
-        />
+      {/* 🚀 Course Gallery Grid */}
+      <div className="flex-1">
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-24">
+            <div className="w-10 h-10 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin mb-4" />
+            <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Syncing_Marketplace_Data...</p>
+          </div>
+        ) : filteredCourses.length > 0 ? (
+          <CourseGallery
+            courses={filteredCourses.map(c => ({
+              ...c,
+              enroll: () => onEnroll(c), 
+            }))}
+          />
+        ) : (
+          <div className="text-center py-20 border border-white/5 rounded-3xl bg-white/[0.01]">
+            <p className="text-zinc-500 text-xs font-mono uppercase">No_Modules_Found_In_This_Sector</p>
+          </div>
+        )}
       </div>
     </div>
   );
