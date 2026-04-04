@@ -1,3 +1,4 @@
+import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function PillarOverlay({ isOpen, onClose, title }) {
