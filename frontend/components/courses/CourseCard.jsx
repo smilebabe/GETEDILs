@@ -1,10 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const CourseCard = ({ title, instructor, price }) => {
-  const [pulse, setPulse] = useState(false);
+// Map pillars to neon colors
+const PILLAR_COLORS = {
+  Finance: '#16A34A',      // Green
+  Skills: '#3B82F6',       // Blue
+  Jobs: '#F59E0B',         // Amber
+  RealEstate: '#F43F5E',   // Pink/Red
+  Logistics: '#A855F7',    // Purple
+  Default: '#EAB308',      // Neon Yellow
+};
 
-  // Trigger pulse when component mounts or price changes
+const CourseCard = ({ title, instructor, price, pillar }) => {
+  const [pulse, setPulse] = useState(false);
+  const color = PILLAR_COLORS[pillar] || PILLAR_COLORS.Default;
+
   useEffect(() => {
     setPulse(true);
     const timer = setTimeout(() => setPulse(false), 800);
@@ -16,7 +26,8 @@ const CourseCard = ({ title, instructor, price }) => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ scale: 1.03 }}
-      className="relative bg-white/5 backdrop-blur-lg border border-white/10 rounded-xl p-4 cursor-pointer shadow-xl shadow-amber-500/20 overflow-hidden transition-all"
+      className="relative bg-white/5 backdrop-blur-lg border rounded-xl p-4 cursor-pointer shadow-xl overflow-hidden transition-all"
+      style={{ borderColor: color }}
     >
       {/* Glow Pulse */}
       <AnimatePresence>
@@ -26,7 +37,8 @@ const CourseCard = ({ title, instructor, price }) => {
             animate={{ opacity: 0.4, scale: 1.2 }}
             exit={{ opacity: 0, scale: 1.4 }}
             transition={{ duration: 0.6 }}
-            className="absolute inset-0 rounded-xl bg-amber-400/20 blur-2xl"
+            className="absolute inset-0 rounded-xl blur-2xl"
+            style={{ backgroundColor: `${color}33` }} // semi-transparent
           />
         )}
       </AnimatePresence>
@@ -35,14 +47,18 @@ const CourseCard = ({ title, instructor, price }) => {
       <motion.div
         initial={{ opacity: 0 }}
         whileHover={{ opacity: 0.15 }}
-        className="absolute inset-0 bg-gradient-to-tr from-yellow-400 via-amber-500 to-orange-500 rounded-xl pointer-events-none"
+        className="absolute inset-0 rounded-xl pointer-events-none"
+        style={{ background: `radial-gradient(circle at top left, ${color}33, transparent)` }}
       />
 
       {/* Card Content */}
       <div className="relative z-10 flex flex-col justify-between h-full">
         <h3 className="text-white font-semibold text-lg">{title}</h3>
         <p className="text-slate-300 text-sm mt-1">{instructor}</p>
-        <button className="mt-4 py-2 px-4 rounded-lg bg-amber-400 text-black font-bold hover:shadow-lg hover:scale-105 transition-all">
+        <button
+          className="mt-4 py-2 px-4 rounded-lg font-bold text-black hover:shadow-lg hover:scale-105 transition-all"
+          style={{ backgroundColor: color }}
+        >
           ENROLL {price} ETB
         </button>
       </div>
