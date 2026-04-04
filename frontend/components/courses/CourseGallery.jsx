@@ -10,6 +10,7 @@ const CourseGallery = ({ courses }) => {
           title={course.title}
           instructor={course.instructor}
           price={course.price}
+          pillar={course.pillar} // Pass pillar type
         />
       ))}
     </div>
