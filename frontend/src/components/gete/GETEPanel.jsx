@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createClient } from '@supabase/supabase-js';
 import { useGETEStore } from '../../store/geteStore';
@@ -10,30 +10,38 @@ const supabase = createClient(
 );
 
 export default function GETEPanel() {
-  const { isOpen, close, context, messages, addMessage } = useGETEStore();
+  // --- IMPROVED SELECTORS: These ensure the latest state is always used ---
+  const isOpen = useGETEStore((state) => state.isOpen);
+  const close = useGETEStore((state) => state.close);
+  const context = useGETEStore((state) => state.context); 
+  const messages = useGETEStore((state) => state.messages);
+  const addMessage = useGETEStore((state) => state.addMessage);
+
   const [input, setInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
   const suggestion = getSuggestion(context);
 
-  // LOGIC ENGINE
   const handleSend = async () => {
     if (!input.trim() || isProcessing) return;
 
     const userText = input;
     setIsProcessing(true);
     
-    // 1. Show user message immediately
+    // 1. Log context for debugging (Check your browser console!)
+    console.log("SENDING_COMMAND_IN_CONTEXT:", context);
+
     addMessage({ role: 'user', text: userText });
     setInput('');
 
     try {
-      // Normalize context to handle any hidden spaces or casing issues
+      // Normalize context
       const activeContext = context?.trim();
 
       // --- PILLAR: FEDERAL POLICE / POLICE DB ---
+      // We check for both variations to be safe
       if (activeContext === "Federal Police" || activeContext === "Police DB") {
-        addMessage({ role: 'assistant', text: `🔍 SCANNING_FEDERAL_LEDGER for: "${userText}"...` });
+        addMessage({ role: 'assistant', text: `🔍 SCANNING_FEDERAL_LEDGER...` });
         
         const { data, error } = await supabase
           .from('citizens_trust')
@@ -53,7 +61,7 @@ export default function GETEPanel() {
       
       // --- PILLAR: REAL ESTATE ---
       else if (activeContext === "Real Estate") {
-        addMessage({ role: 'assistant', text: `🏠 QUERYING_PROPERTIES in: "${userText}"...` });
+        addMessage({ role: 'assistant', text: `🏠 QUERYING_PROPERTIES...` });
         
         const { data } = await supabase
           .from('properties')
@@ -63,15 +71,15 @@ export default function GETEPanel() {
         if (data && data.length > 0) {
           addMessage({ role: 'assistant', text: `📍 Found ${data.length} listings. Syncing Map Nodes...` });
         } else {
-          addMessage({ role: 'assistant', text: "📭 No verified listings found in this sector." });
+          addMessage({ role: 'assistant', text: "📭 No listings found in this sector." });
         }
       }
 
-      // --- FALLBACK: SYSTEM DIAGNOSTIC ---
+      // --- FALLBACK DIAGNOSTIC ---
       else {
         addMessage({ 
           role: 'assistant', 
-          text: `SYSTEM_OFFLINE: Neural link context is [${activeContext || 'UNDEFINED'}].\n\nPlease select a Pillar (e.g., Police DB) to activate database queries.` 
+          text: `SYSTEM_OFFLINE: Context is [${activeContext || 'EMPTY'}].\n\nPlease select a Pillar Node (e.g., Police DB) to activate intelligence.` 
         });
       }
 
