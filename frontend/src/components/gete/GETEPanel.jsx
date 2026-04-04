@@ -39,25 +39,27 @@ export default function GETEPanel() {
       const activeContext = context?.trim();
 
       // --- PILLAR: FEDERAL POLICE / POLICE DB ---
-      // We check for both variations to be safe
       if (activeContext === "Federal Police" || activeContext === "Police DB") {
         addMessage({ role: 'assistant', text: `🔍 SCANNING_FEDERAL_LEDGER...` });
         
         const { data, error } = await supabase
           .from('citizens_trust')
           .select('*')
-          .ilike('full_name', `%${userText}%`)
-          .single();
+          .ilike('full_name', `%${userText}%`); // Removed .single()
 
-        if (data) {
+        if (data && data.length > 0) {
+          // If multiple people found, show the first one but mention the count
+          const person = data[0]; 
+          const multiMatch = data.length > 1 ? `\n⚠️ [SYSTEM_NOTE: ${data.length} records found]` : '';
+          
           addMessage({ 
             role: 'assistant', 
-            text: `✅ RECORD_FOUND\n──────────────\nNAME: ${data.full_name}\nTRUST: ${data.trust_score}%\nSTATUS: ${data.status}` 
+            text: `✅ RECORD_FOUND${multiMatch}\n──────────────\nNAME: ${person.full_name}\nTRUST: ${person.trust_score}%\nSTATUS: ${person.status}` 
           });
         } else {
           addMessage({ role: 'assistant', text: `❌ NO_MATCH: "${userText}" not found in verified registry.` });
         }
-      } 
+      }
       
       // --- PILLAR: REAL ESTATE ---
       else if (activeContext === "Real Estate") {
