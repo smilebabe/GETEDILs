@@ -1,77 +1,96 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { useMyCourses } from '../../hooks/useMyCourses';
 import ProgressRow from '../../components/getskill/ProgressRow';
 
-const MyAcademyView = ({ onNavigateToMarketplace }) => {
-  const { myCourses, loading } = useMyCourses();
-
-  // Calculate Average Skill Level (Average Progress)
+const MyAcademyView = ({ courses, isLoading, onNavigateToMarketplace }) => {
+  
+  // Calculate Average Neural Progress from Real DB Data
   const averageProgress = useMemo(() => {
-    if (!myCourses.length) return 0;
-    const total = myCourses.reduce((acc, curr) => acc + Number(curr.progress), 0);
-    return Math.round(total / myCourses.length);
-  }, [myCourses]);
+    if (!courses || courses.length === 0) return 0;
+    const total = courses.reduce((acc, curr) => acc + (Number(curr.progress_percentage) || 0), 0);
+    return Math.round(total / courses.length);
+  }, [courses]);
 
-  if (loading) {
+  // Rank logic based on total progress
+  const getRank = (progress) => {
+    if (progress === 100) return 'MASTER_ARCHITECT';
+    if (progress > 75) return 'ELITE_SYSTEM_ADAPT';
+    if (progress > 40) return 'NEURAL_PROTOTYPE';
+    return 'INITIATE_CORE';
+  };
+
+  if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-full space-y-4">
-        <div className="w-8 h-8 border-2 border-[#3B82F6] border-t-transparent rounded-full animate-spin" />
-        <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Accessing_Neural_Vault...</p>
+      <div className="flex flex-col items-center justify-center h-80 space-y-5">
+        <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-[0.4em]">decrypting_neural_vault...</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-[#0a0a0a] text-white p-4 overflow-y-auto pb-24">
+    <div className="flex flex-col h-full text-white overflow-y-auto pb-20 no-scrollbar">
       
-      {/* Skill Level Header */}
-      <header className="mb-8 p-6 bg-gradient-to-br from-white/5 to-transparent border border-white/10 rounded-3xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-4 opacity-10">
-          <div className="w-24 h-24 border-4 border-[#3B82F6] rounded-full flex items-center justify-center font-black text-2xl">
+      {/* 🧠 Skill Level Header (Integrated) */}
+      <header className="mb-10 p-8 bg-gradient-to-br from-blue-600/15 via-blue-900/5 to-transparent border border-blue-500/20 rounded-[2.5rem] relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-6 opacity-30">
+          <div className="w-24 h-24 border-[6px] border-blue-500/30 rounded-full flex items-center justify-center font-black text-2xl text-blue-400">
             {averageProgress}%
           </div>
         </div>
         
-        <p className="text-[10px] font-mono text-[#3B82F6] uppercase tracking-[0.3em] mb-1">Current_Skill_Level</p>
-        <h2 className="text-3xl font-black italic tracking-tighter">
-          {averageProgress === 100 ? 'MASTER_ARCHITECT' : averageProgress > 50 ? 'SENIOR_ADAPT' : 'NEURAL_INITIATE'}
+        <p className="text-[10px] font-mono text-blue-400 uppercase tracking-[0.4em] mb-2">Neural_Capability_Index</p>
+        <h2 className="text-3xl font-black italic tracking-tighter uppercase leading-none mb-6">
+          {getRank(averageProgress)}
         </h2>
-        <div className="mt-4 h-1 w-32 bg-white/10 rounded-full overflow-hidden">
-          <div className="h-full bg-[#3B82F6]" style={{ width: `${averageProgress}%` }} />
+        
+        <div className="relative h-2 w-full bg-white/5 rounded-full overflow-hidden">
+          <motion.div 
+            initial={{ width: 0 }}
+            animate={{ width: `${averageProgress}%` }}
+            transition={{ duration: 1.5, ease: "easeOut" }}
+            className="h-full bg-blue-500 shadow-[0_0_20px_#3b82f6]" 
+          />
         </div>
       </header>
 
-      {/* Course List */}
-      <div className="space-y-4">
-        <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-4">Active_Modules</h3>
+      {/* 📚 Course List Section */}
+      <div className="space-y-6">
+        <div className="flex items-center justify-between px-2 mb-2">
+          <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Active_Skill_Modules</h3>
+          <span className="text-[10px] font-mono text-blue-500/50">[{courses?.length || 0}]</span>
+        </div>
         
-        {myCourses.length > 0 ? (
-          myCourses.map((course) => (
-            <ProgressRow 
-              key={course.enrollment_id} 
-              course={course} 
-              onResume={(id) => console.log("Jumping to Lesson Player for Course:", id)}
-            />
-          ))
+        {courses && courses.length > 0 ? (
+          <div className="space-y-4">
+            {courses.map((course) => (
+              <ProgressRow 
+                key={course.id} 
+                course={course} 
+                onResume={(id) => console.log("Initializing Neural Stream for Course:", id)}
+              />
+            ))}
+          </div>
         ) : (
-          /* Holographic Empty State */
+          /* 🌑 Empty State */
           <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex flex-col items-center justify-center py-20 border border-dashed border-white/10 rounded-3xl bg-white/[0.02]"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center justify-center py-20 border border-dashed border-white/10 rounded-[2rem] bg-white/[0.01] backdrop-blur-sm"
           >
-            <div className="text-4xl mb-4 opacity-20">🧠</div>
-            <p className="text-xs text-zinc-400 font-medium mb-2">NO_ACTIVE_SKILLS_DETECTED</p>
-            <p className="text-[10px] text-zinc-600 mb-6 text-center max-w-[200px]">
-              Initialize your training by selecting a module from the Marketplace.
+            <div className="text-5xl mb-6 grayscale opacity-20">📡</div>
+            <p className="text-[11px] text-zinc-400 font-bold mb-2 uppercase tracking-widest">No_Active_Signals</p>
+            <p className="text-[10px] text-zinc-600 mb-8 text-center max-w-[220px] leading-relaxed">
+              Neural vault empty. Please acquire skill assets from the Marketplace to begin synchronization.
             </p>
-            <button 
+            <motion.button 
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={onNavigateToMarketplace}
-              className="px-6 py-2 bg-[#EAB308] text-black text-[10px] font-black rounded-full shadow-[0_0_20px_rgba(234,179,8,0.3)] hover:scale-105 active:scale-95 transition"
+              className="px-8 py-3 bg-yellow-500 text-black text-[10px] font-black rounded-2xl shadow-[0_10px_30px_rgba(234,179,8,0.2)] transition-all uppercase tracking-[0.2em]"
             >
-              BROWSE_MARKETPLACE
-            </button>
+              Access_Marketplace
+            </motion.button>
           </motion.div>
         )}
       </div>
