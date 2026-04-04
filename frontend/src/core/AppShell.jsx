@@ -1,76 +1,70 @@
-// ============================================
-        )}
+import { useEffect } from 'react';
+import { motion } from 'framer-motion';
 
-        {/* Main */}
-        <main className="flex-1 flex flex-col">
+import { REGISTRY } from './Registry';
+import { injectTheme } from './initTheme';
 
-          {/* Top Bar */}
-          <header className="h-16 border-b border-white/10 bg-white/5 backdrop-blur-md flex items-center justify-between px-6">
-            <div className="flex items-center gap-4 flex-1">
-              {isMobile && (
-                <Icons.Menu size={24} onClick={() => setSidebarOpen(true)} />
-              )}
+import { usePillarNavigation } from '@/hooks/usePillarNavigation';
+import useVoiceIntent from '@/hooks/useVoiceIntent';
 
-              <div className="relative w-full max-w-md">
-                <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" size={18} />
-                <input
-                  placeholder="Ask GETE..."
-                  className="w-full bg-white/5 border border-white/10 rounded-full py-2 pl-10 pr-4 focus:ring-2 focus:ring-[var(--color-primary)]/50"
-                />
-              </div>
-            </div>
+import PillarOverlay from '@/components/navigation/PillarOverlay';
+import WalletBalance from '@/components/wallet/WalletBalance';
 
-            <div className="flex items-center gap-4">
-              <button className="p-2 rounded-full bg-white/5">
-                <Icons.Mic size={20} />
-              </button>
-              <div className="w-10 h-10 rounded-full bg-white/10" />
-            </div>
-          </header>
+export default function AppShell() {
+  const {
+    activeOverlay,
+    openPillar,
+    closeOverlay
+  } = usePillarNavigation();
 
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto p-6">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activePillar}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-              >
-                {children}
-              </motion.div>
-            </AnimatePresence>
-          </div>
+  // 🎨 Inject theme once
+  useEffect(() => {
+    injectTheme();
+  }, []);
 
-          {/* Mobile Nav */}
-          {isMobile && (
-            <nav className="h-20 bg-black/40 backdrop-blur-xl flex justify-around items-center">
-              {visiblePillars.slice(0,5).map((p) => {
-                const Icon = Icons[p.icon] || Icons.Circle;
-                return (
-                  <MobileNavItem key={p.id} icon={<Icon />} active={activePillar === p.id} />
-                );
-              })}
-            </nav>
-          )}
+  // 🎤 Voice control
+  useVoiceIntent(openPillar);
 
-        </main>
+  return (
+    <div className="min-h-screen bg-[var(--color-dark)] text-white p-6">
+
+      {/* 🔝 Top Bar */}
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-xl font-semibold tracking-wide">
+          GETEDIL OS
+        </h1>
+
+        {/* 💰 Wallet */}
+        <WalletBalance value={1250.75} />
       </div>
+
+      {/* 🧩 Pillar Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        {REGISTRY.map((pillar) => (
+          <motion.div
+            key={pillar.id}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => openPillar(pillar.name)}
+            className="cursor-pointer p-6 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 hover:border-white/30 transition"
+          >
+            <div className="text-sm text-white/50 mb-2">
+              {pillar.id}
+            </div>
+
+            <div className="text-lg font-medium">
+              {pillar.name}
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* 🌐 Overlay Layer */}
+      <PillarOverlay
+        isOpen={!!activeOverlay}
+        title={activeOverlay}
+        onClose={closeOverlay}
+      />
     </div>
   );
-};
-
-const NavItem = ({ icon, label, active, collapsed }) => (
-  <div className={`flex items-center gap-4 p-3 rounded-xl transition ${active ? 'bg-white/10 text-[var(--color-primary)]' : 'text-white/60 hover:bg-white/5'}`}>
-    {icon}
-    {!collapsed && <span>{label}</span>}
-  </div>
-);
-
-const MobileNavItem = ({ icon, active }) => (
-  <div className={`${active ? 'text-[var(--color-primary)]' : 'text-white/40'}`}>
-    {React.cloneElement(icon, { size: 24 })}
-  </div>
-);
-
-export default AppShell;
+}
