@@ -1,75 +1,48 @@
-import { useEffect } from 'react';
-import { motion } from 'framer-motion';
-import GETEPanel from '@/components/gete/GETEPanel';
-import GETEButton from '@/components/gete/GETEButton';
-import { useGETEStore } from '@/store/geteStore';
-
-import { REGISTRY } from './Registry';
-import { injectTheme } from './initTheme';
-
-import { usePillarNavigation } from '@/hooks/usePillarNavigation';
-import useVoiceIntent from '@/hooks/useVoiceIntent';
-
-import PillarOverlay from '@/components/navigation/PillarOverlay';
-import WalletBalance from '@/components/wallet/WalletBalance';
-
 export default function AppShell() {
-  const {
-    activeOverlay,
-    openPillar,
-    closeOverlay
-  } = usePillarNavigation();
-const setContext = useGETEStore((s) => s.setContext)
-  // 🎨 Inject theme once
-  useEffect(() => {
-    injectTheme();
-  }, []);
+  const { activeOverlay, openPillar, closeOverlay } = usePillarNavigation();
+  const setContext = useGETEStore((s) => s.setContext);
 
-  // 🎤 Voice control
+  useEffect(() => { injectTheme(); }, []);
   useVoiceIntent(openPillar);
 
   return (
     <div className="min-h-screen bg-[var(--color-dark)] text-white p-6">
-
-      {/* 🔝 Top Bar */}
+      {/* Top Bar */}
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-xl font-semibold tracking-wide">
-          GETEDIL OS
-        </h1>
-
-        {/* 💰 Wallet */}
-        <WalletBalance value={1250.75} />
+        <h1 className="text-xl font-semibold tracking-wide">GETEDIL OS</h1>
+        <WalletBalance />
       </div>
 
-      {/* 🧩 Pillar Grid */}
+      {/* Pillar Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
         {REGISTRY.map((pillar) => (
           <motion.div
             key={pillar.id}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => openPillar(pillar.name)}
+            onClick={() => {
+              setContext(pillar.name);
+              openPillar(pillar.name);
+            }}
+            aria-label={`Open ${pillar.name} pillar`}
             className="cursor-pointer p-6 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 hover:border-white/30 transition"
           >
-            <div className="text-sm text-white/50 mb-2">
-              {pillar.id}
-            </div>
-
-            <div className="text-lg font-medium">
-              {pillar.name}
-            </div>
+            <div className="text-sm text-white/50 mb-2">{pillar.id}</div>
+            <div className="text-lg font-medium">{pillar.name}</div>
           </motion.div>
         ))}
       </div>
 
-      {/* 🌐 Overlay Layer */}
+      {/* Overlay Layer */}
       <PillarOverlay
         isOpen={!!activeOverlay}
         title={activeOverlay}
         onClose={closeOverlay}
       />
+
+      {/* AI Assistance */}
+      <GETEPanel />
+      <GETEButton />
     </div>
   );
 }
-<GETEPanel />
-<GETEButton />
