@@ -1,11 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
-// These environment variables should be in your .env file
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+// Vite uses import.meta.env instead of process.env
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn("Supabase credentials missing. Check your .env file.");
+  // This will now only trigger if BOTH are missing after checking both prefixes
+  console.warn("Supabase credentials missing. Ensure they are set in the Vercel Dashboard.");
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
