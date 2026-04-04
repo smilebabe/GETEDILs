@@ -76,12 +76,19 @@ const AuthPortal = () => (
       <h1 className="text-4xl font-bold tracking-tight mb-2">GETEDIL<span className="text-yellow-500">-OS</span></h1>
       <p className="text-gray-400 mb-10 font-light italic">Ethiopia's Digital Gateway</p>
       
-      <button 
-        onClick={() => supabase.auth.signInWithOAuth({ provider: 'google' })}
-        className="group w-full py-4 bg-white text-black font-bold rounded-2xl hover:bg-yellow-500 transition-all flex items-center justify-center gap-3 active:scale-95"
-      >
-        Continue with Google
-      </button>
+      // Inside AuthPortal component
+<button 
+  onClick={() => supabase.auth.signInWithOAuth({ 
+    provider: 'google',
+    options: {
+      // window.location.origin will automatically be "https://getedi-ls.vercel.app" on Vercel
+      redirectTo: window.location.origin 
+    }
+  })}
+  className="..."
+>
+  Continue with Google
+</button>
       
       <p className="mt-8 text-[10px] text-gray-500 uppercase tracking-widest leading-relaxed">
         Secure End-to-End Encryption • Powered by GETEDIL-CORE
