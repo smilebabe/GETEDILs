@@ -8,7 +8,7 @@ import {
   UserPlus, Briefcase, Home, ShieldCheck, Users, GraduationCap,
   Wallet, Share2, Video, ShoppingCart, Globe, FileText, Scale,
   Truck, Star, Store, Tag, CreditCard, Users2, User, Settings,
-  Code, MapPin, Layers, Gift, Bell, BarChart3, Bot
+  Code, MapPin, Layers, Gift, Bell, BarChart3, Bot, Database
 } from 'lucide-react';
 
 // 🔹 Role hierarchy map for consistent enforcement
@@ -22,6 +22,7 @@ export const ROLE_LEVELS = {
 
 // 🔹 Central pillar registry
 export const REGISTRY = Object.freeze([
+  // Core
   {
     id: 'P0',
     name: 'Onboarding',
@@ -52,6 +53,8 @@ export const REGISTRY = Object.freeze([
     description: 'Browse and apply for jobs',
     auditable: true
   },
+
+  // Commerce
   {
     id: 'P9',
     name: 'GetTraded',
@@ -63,6 +66,18 @@ export const REGISTRY = Object.freeze([
     auditable: true
   },
   {
+    id: 'P10',
+    name: 'GetStore',
+    icon: Store,
+    path: '/store',
+    permission: 'premium',
+    category: 'Commerce',
+    description: 'Premium storefront for curated products',
+    auditable: true
+  },
+
+  // Governance
+  {
     id: 'P20',
     name: 'GetAdmin',
     icon: Settings,
@@ -73,6 +88,28 @@ export const REGISTRY = Object.freeze([
     auditable: true
   },
   {
+    id: 'P21',
+    name: 'PoliceDB',
+    icon: ShieldCheck,
+    path: '/police',
+    permission: 'admin',
+    category: 'Governance',
+    description: 'Law enforcement database access',
+    auditable: true
+  },
+  {
+    id: 'P22',
+    name: 'LegalRecords',
+    icon: Scale,
+    path: '/legal',
+    permission: 'admin',
+    category: 'Governance',
+    description: 'Court and legal document repository',
+    auditable: true
+  },
+
+  // AI & Automation
+  {
     id: 'P27',
     name: 'GetAutomated',
     icon: Bot,
@@ -82,7 +119,62 @@ export const REGISTRY = Object.freeze([
     description: 'Automation and orchestration workflows',
     auditable: true
   },
-  // ... include all other pillars with metadata
+  {
+    id: 'P28',
+    name: 'DeveloperHub',
+    icon: Code,
+    path: '/devhub',
+    permission: 'developer',
+    category: 'AI',
+    description: 'Developer tools, APIs, and orchestration',
+    auditable: true
+  },
+
+  // Finance
+  {
+    id: 'P30',
+    name: 'Wallet',
+    icon: Wallet,
+    path: '/wallet',
+    permission: 'user',
+    category: 'Finance',
+    description: 'Digital wallet and payments',
+    auditable: true
+  },
+  {
+    id: 'P31',
+    name: 'CreditServices',
+    icon: CreditCard,
+    path: '/credit',
+    permission: 'premium',
+    category: 'Finance',
+    description: 'Credit scoring and premium financial services',
+    auditable: true
+  },
+
+  // Education
+  {
+    id: 'P40',
+    name: 'Academy',
+    icon: GraduationCap,
+    path: '/academy',
+    permission: 'user',
+    category: 'Education',
+    description: 'Learning modules and certifications',
+    auditable: true
+  },
+
+  // Analytics
+  {
+    id: 'P50',
+    name: 'GovernanceAnalytics',
+    icon: BarChart3,
+    path: '/analytics',
+    permission: 'admin',
+    category: 'Analytics',
+    description: 'Real-time dashboards and governance metrics',
+    auditable: true
+  }
 ]);
 
 // 🔹 Utility functions
