@@ -1,58 +1,53 @@
-import { motion } from 'framer-motion';
+import React, { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
-export default function CourseCard({ course }) {
+const CourseCard = ({ title, instructor, price }) => {
+  const [pulse, setPulse] = useState(false);
+
+  // Trigger pulse when component mounts or price changes
+  useEffect(() => {
+    setPulse(true);
+    const timer = setTimeout(() => setPulse(false), 800);
+    return () => clearTimeout(timer);
+  }, [price]);
+
   return (
     <motion.div
-      whileHover={{
-        scale: 1.03,
-        boxShadow: '0 0 25px rgba(234,179,8,0.35)'
-      }}
-      transition={{ type: 'spring', stiffness: 200, damping: 18 }}
-      className="
-        relative
-        p-4
-        rounded-2xl
-        bg-white/5
-        backdrop-blur-xl
-        border border-white/10
-        text-white
-        flex flex-col justify-between
-      "
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ scale: 1.03 }}
+      className="relative bg-white/5 backdrop-blur-lg border border-white/10 rounded-xl p-4 cursor-pointer shadow-xl shadow-amber-500/20 overflow-hidden transition-all"
     >
-      {/* Glow Overlay */}
-      <div className="absolute inset-0 rounded-2xl pointer-events-none bg-gradient-to-br from-yellow-400/10 to-transparent opacity-0 hover:opacity-100 transition" />
+      {/* Glow Pulse */}
+      <AnimatePresence>
+        {pulse && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 0.4, scale: 1.2 }}
+            exit={{ opacity: 0, scale: 1.4 }}
+            transition={{ duration: 0.6 }}
+            className="absolute inset-0 rounded-xl bg-amber-400/20 blur-2xl"
+          />
+        )}
+      </AnimatePresence>
 
-      {/* Content */}
-      <div className="space-y-2">
-        <h3 className="text-sm font-semibold leading-snug tracking-wide">
-          {course.title}
-        </h3>
+      {/* Hover Overlay */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        whileHover={{ opacity: 0.15 }}
+        className="absolute inset-0 bg-gradient-to-tr from-yellow-400 via-amber-500 to-orange-500 rounded-xl pointer-events-none"
+      />
 
-        <p className="text-xs text-white/50">
-          {course.instructor}
-        </p>
-      </div>
-
-      {/* Footer */}
-      <div className="mt-4 flex items-center justify-between">
-        <span className="text-xs text-yellow-400 font-medium">
-          {course.price} ETB
-        </span>
-
-        <motion.button
-          whileTap={{ scale: 0.92 }}
-          className="
-            px-3 py-1
-            text-xs font-semibold
-            rounded-lg
-            bg-gradient-to-r from-yellow-400 to-amber-500
-            text-black
-            shadow-[0_0_10px_rgba(234,179,8,0.6)]
-          "
-        >
-          ENROLL
-        </motion.button>
+      {/* Card Content */}
+      <div className="relative z-10 flex flex-col justify-between h-full">
+        <h3 className="text-white font-semibold text-lg">{title}</h3>
+        <p className="text-slate-300 text-sm mt-1">{instructor}</p>
+        <button className="mt-4 py-2 px-4 rounded-lg bg-amber-400 text-black font-bold hover:shadow-lg hover:scale-105 transition-all">
+          ENROLL {price} ETB
+        </button>
       </div>
     </motion.div>
   );
-}
+};
+
+export default CourseCard;
