@@ -1,19 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import OpportunityCard from './OpportunityCard'; // Integrated your new component
 
-/**
- * ChatInterface Component
- * Conversational AI interface for GETE Assistant
- * Supports typing indicators, markdown, and quick replies
- */
-
-const ChatInterface = ({ history, onSendMessage, isTyping = false, fullscreen = false }) => {
+const ChatInterface = ({ history = [], onSendMessage, isTyping = false, fullscreen = false }) => {
     const [inputMessage, setInputMessage] = useState('');
     const [showQuickReplies, setShowQuickReplies] = useState(true);
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
 
-    // Auto-scroll to bottom on new messages
+    // Auto-scroll logic
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [history, isTyping]);
@@ -24,12 +19,10 @@ const ChatInterface = ({ history, onSendMessage, isTyping = false, fullscreen = 
     }, []);
 
     const quickReplies = [
-        { text: 'Find jobs near me', icon: '💼', action: 'find jobs in Addis Ababa' },
-        { text: 'Check my balance', icon: '💰', action: 'check my wallet balance' },
-        { text: 'Browse courses', icon: '📚', action: 'show me available courses' },
-        { text: 'Send money', icon: '📤', action: 'send money' },
-        { text: 'Get help', icon: '🤝', action: 'help me with the app' },
-        { text: 'Marketplace deals', icon: '🛒', action: 'show me marketplace deals' }
+        { text: 'Find jobs', icon: '💼', action: 'find jobs in Addis Ababa' },
+        { text: 'My Balance', icon: '💰', action: 'check my wallet balance' },
+        { text: 'GetSkill P1', icon: '📚', action: 'show me courses' },
+        { text: 'Marketplace', icon: '🛒', action: 'show marketplace deals' }
     ];
 
     const handleSend = () => {
@@ -46,142 +39,120 @@ const ChatInterface = ({ history, onSendMessage, isTyping = false, fullscreen = 
         }
     };
 
-    const handleQuickReply = (action) => {
-        onSendMessage(action);
-        setShowQuickReplies(false);
-    };
-
     const formatMessage = (text) => {
-        // Simple markdown-like formatting
+        if (!text) return "";
         let formatted = text;
-        
-        // Bold
-        formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="text-[#EAB308]">$1</strong>');
-        
-        // Links
-        formatted = formatted.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" class="text-[#EAB308] underline">$1</a>');
-        
-        // Ethiopian Birr formatting
-        formatted = formatted.replace(/(\d+(?:,\d+)*)\s*ETB/g, '<span class="text-[#EAB308] font-bold">$1 ETB</span>');
-        
+        // Bold & ETB Formatting
+        formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="text-yellow-500">$1</strong>');
+        formatted = formatted.replace(/(\d+(?:,\d+)*)\s*ETB/g, '<span class="text-yellow-500 font-bold">$1 ETB</span>');
         return formatted;
     };
 
     return (
-        <div className={`flex flex-col h-full ${fullscreen ? '' : 'h-[400px]'}`}>
+        <div className={`flex flex-col w-full bg-zinc-950 overflow-hidden ${fullscreen ? 'h-screen' : 'h-[600px] rounded-2xl border border-white/10'}`}>
+            
             {/* Chat History */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {history && history.length > 0 ? (
+            <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
+                {history.length > 0 ? (
                     history.map((message, index) => (
                         <motion.div
                             key={message.id || index}
-                            initial={{ opacity: 0, y: 20 }}
+                            initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
                         >
-                            <div
-                                className={`max-w-[80%] rounded-2xl p-3 ${
-                                    message.type === 'user'
-                                        ? 'bg-gradient-to-r from-[#EAB308] to-[#F59E0B] text-black'
-                                        : 'bg-white/10 text-white'
-                                }`}
-                            >
-                                {message.type === 'assistant' ? (
-                                    <div 
-                                        dangerouslySetInnerHTML={{ __html: formatMessage(message.message) }}
-                                        className="text-sm leading-relaxed"
-                                    />
-                                ) : (
-                                    <p className="text-sm">{message.message}</p>
-                                )}
+                            <div className={`max-w-[90%] ${message.type === 'user' ? 'text-right' : 'text-left'}`}>
                                 
+                                {/* Text Bubble */}
+                                {message.message && (
+                                    <div className={`inline-block rounded-2xl p-3 text-sm shadow-sm ${
+                                        message.type === 'user'
+                                            ? 'bg-yellow-500 text-black font-medium'
+                                            : 'bg-zinc-900 text-zinc-100 border border-white/5'
+                                    }`}>
+                                        <div dangerouslySetInnerHTML={{ __html: formatMessage(message.message) }} />
+                                    </div>
+                                )}
+
+                                {/* INTEGRATION: If the message contains Opportunity Data */}
+                                {message.opportunities && (
+                                    <div className="mt-4 w-full max-w-[400px]">
+                                        <OpportunityCard 
+                                            opportunities={message.opportunities} 
+                                            onSelect={(item) => onSendMessage(`I want to select: ${item.title}`)}
+                                            compact={fullscreen ? false : true}
+                                        />
+                                    </div>
+                                )}
+
                                 {message.timestamp && (
-                                    <p className="text-xs opacity-70 mt-1">
-                                        {new Date(message.timestamp).toLocaleTimeString('en-ET', {
-                                            hour: '2-digit',
-                                            minute: '2-digit'
-                                        })}
+                                    <p className="text-[10px] text-zinc-600 mt-1 uppercase tracking-widest">
+                                        {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </p>
                                 )}
                             </div>
                         </motion.div>
                     ))
                 ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-center">
-                        <div className="w-20 h-20 bg-gradient-to-r from-[#EAB308]/20 to-[#F59E0B]/20 rounded-full flex items-center justify-center mb-4">
-                            <span className="text-4xl">🤖</span>
-                        </div>
-                        <h3 className="text-white font-semibold mb-2">Welcome to GETE Assistant!</h3>
-                        <p className="text-slate-400 text-sm">
-                            Ask me anything about jobs, courses, payments, or Ethiopian opportunities.
-                        </p>
+                    /* Empty State - OS Logo Glow */
+                    <div className="flex flex-col items-center justify-center h-full opacity-40">
+                        <div className="w-16 h-16 bg-yellow-500/20 rounded-full blur-2xl absolute" />
+                        <span className="text-5xl mb-4">G</span>
+                        <p className="text-xs tracking-[0.2em] uppercase font-black text-white">Neural Link Active</p>
                     </div>
                 )}
                 
-                {/* Typing Indicator */}
                 {isTyping && (
                     <div className="flex justify-start">
-                        <div className="bg-white/10 rounded-2xl p-3">
+                        <div className="bg-zinc-900 rounded-2xl px-4 py-3 border border-white/5">
                             <div className="flex gap-1">
-                                <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-bounce" />
+                                <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-bounce [animation-delay:0.2s]" />
+                                <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-bounce [animation-delay:0.4s]" />
                             </div>
                         </div>
                     </div>
                 )}
-                
                 <div ref={messagesEndRef} />
             </div>
-            
+
             {/* Quick Replies */}
-            {showQuickReplies && history?.length < 3 && (
-                <div className="px-4 pb-2">
-                    <div className="flex flex-wrap gap-2">
-                        {quickReplies.map((reply, index) => (
-                            <motion.button
-                                key={index}
-                                initial={{ opacity: 0, scale: 0.8 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ delay: index * 0.05 }}
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => handleQuickReply(reply.action)}
-                                className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-full text-xs text-white transition-all"
+            {showQuickReplies && (
+                <div className="px-4 py-2 overflow-x-auto no-scrollbar">
+                    <div className="flex gap-2">
+                        {quickReplies.map((reply, i) => (
+                            <button
+                                key={i}
+                                onClick={() => { onSendMessage(reply.action); setShowQuickReplies(false); }}
+                                className="whitespace-nowrap px-4 py-2 bg-zinc-900 border border-white/5 rounded-full text-xs text-zinc-300 hover:border-yellow-500/50 transition-all"
                             >
-                                <span className="mr-1">{reply.icon}</span>
-                                {reply.text}
-                            </motion.button>
+                                {reply.icon} {reply.text}
+                            </button>
                         ))}
                     </div>
                 </div>
             )}
-            
+
             {/* Input Area */}
-            <div className="p-4 border-t border-white/10">
-                <div className="flex gap-2">
+            <div className="p-4 bg-zinc-950 border-t border-white/5">
+                <div className="flex gap-2 items-center bg-zinc-900 border border-white/10 rounded-2xl p-1 focus-within:border-yellow-500/50 transition-all">
                     <input
                         ref={inputRef}
                         type="text"
                         value={inputMessage}
                         onChange={(e) => setInputMessage(e.target.value)}
                         onKeyPress={handleKeyPress}
-                        placeholder="Type your message..."
-                        className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-2 text-white placeholder:text-slate-500 focus:outline-none focus:border-[#EAB308] transition-all"
+                        placeholder="Ask GETE Assistant..."
+                        className="flex-1 bg-transparent px-4 py-2 text-sm text-white outline-none placeholder:text-zinc-600"
                     />
                     <button
                         onClick={handleSend}
                         disabled={!inputMessage.trim()}
-                        className="px-4 py-2 bg-gradient-to-r from-[#EAB308] to-[#F59E0B] text-black font-semibold rounded-xl hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="bg-yellow-500 text-black p-2 px-5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-yellow-400 disabled:opacity-30 transition-all"
                     >
                         Send
                     </button>
                 </div>
-                
-                {/* Voice Input Hint */}
-                <p className="text-xs text-slate-500 text-center mt-2">
-                    🎤 Try voice commands or type your request
-                </p>
             </div>
         </div>
     );
