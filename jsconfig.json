@@ -2,7 +2,13 @@
   "compilerOptions": {
     "baseUrl": "./src",
     "paths": {
-      "@/*": ["*"]
+      "@hooks/*": ["hooks/*"],
+      "@core/*": ["core/*"],
+      "@lib/*": ["lib/*"],
+      "@components/*": ["components/*"],
+      "@store/*": ["store/*"],
+      "@styles/*": ["styles/*"]
     }
-  }
+  },
+  "exclude": ["node_modules", "dist"]
 }
