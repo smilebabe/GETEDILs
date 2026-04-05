@@ -24,18 +24,25 @@ function getValidationHints(password) {
 
 export default function ResetPassword() {
   const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const strength = getPasswordStrength(newPassword);
   const hints = getValidationHints(newPassword);
+  const passwordsMatch = newPassword === confirmPassword;
 
   async function handleReset(e) {
     e.preventDefault();
+    if (!passwordsMatch) {
+      registry.notify("Passwords do not match!", "error");
+      return;
+    }
     setLoading(true);
     const { error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) registry.notify("Password reset failed: " + error.message, "error");
-    else {
+    if (error) {
+      registry.notify("Password reset failed: " + error.message, "error");
+    } else {
       registry.notify("Password updated successfully! You can now log in.", "success");
       window.location.href = "/reset-success";
     }
@@ -45,7 +52,8 @@ export default function ResetPassword() {
   return (
     <div style={{ color: "white", padding: "1rem" }}>
       <h2>Reset Your Password</h2>
-      <form>
+      <form onSubmit={handleReset}>
+        {/* New password input */}
         <div style={{ marginBottom: "0.5rem" }}>
           <input
             type={showPassword ? "text" : "password"}
@@ -65,10 +73,87 @@ export default function ResetPassword() {
           </label>
         </div>
 
-       {newPassword && (
-  <div style={{ marginTop: "1rem" }}>
-    <p>New password set successfully!</p>
-  </div>
-)
-       }
-        
+        {/* Confirm password input */}
+        <div style={{ marginBottom: "0.5rem" }}>
+          <input
+            type={showPassword ? "text" : "password"}
+            placeholder="Confirm Password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+          />
+        </div>
+
+        {/* Password strength meter */}
+        {newPassword && strength && (
+          <div style={{ marginTop: "0.5rem" }}>
+            <div
+              style={{
+                background: "#333",
+                height: "8px",
+                borderRadius: "4px",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  width: strength.width,
+                  background: strength.color,
+                  height: "100%",
+                  transition: "width 0.3s ease",
+                }}
+              />
+            </div>
+            <p style={{ color: strength.color, marginTop: "0.25rem" }}>
+              Strength: {strength.label}
+            </p>
+          </div>
+        )}
+
+        {/* Validation hints */}
+        {newPassword && (
+          <ul style={{ marginTop: "0.5rem", paddingLeft: "1rem" }}>
+            {hints.map((hint, idx) => (
+              <li
+                key={idx}
+                style={{
+                  color: hint.valid ? "limegreen" : "crimson",
+                  fontSize: "0.9rem",
+                }}
+              >
+                {hint.text}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* Password match feedback */}
+        {confirmPassword && !passwordsMatch && (
+          <p style={{ color: "crimson", marginTop: "0.5rem" }}>
+            Passwords do not match
+          </p>
+        )}
+        {confirmPassword && passwordsMatch && (
+          <p style={{ color: "limegreen", marginTop: "0.5rem" }}>
+            Passwords match ✔
+          </p>
+        )}
+
+        <button
+          type="submit"
+          disabled={loading || !newPassword || !confirmPassword || !passwordsMatch}
+          style={{
+            background: "limegreen",
+            color: "white",
+            border: "none",
+            padding: "0.5rem 1rem",
+            borderRadius: "4px",
+            cursor: "pointer",
+            marginTop: "1rem",
+          }}
+        >
+          {loading ? "Resetting..." : "Reset Password"}
+        </button>
+      </form>
+    </div>
+  );
+}
