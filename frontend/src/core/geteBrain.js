@@ -22,17 +22,10 @@ export async function generateResponse(userId, input, options = {}) {
     const res = await fetch("/api/geteBrain", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId,
-        input,
-        options,
-        context, // pass enriched context to backend
-      }),
+      body: JSON.stringify({ userId, input, options, context }),
     });
 
-    if (!res.ok) {
-      throw new Error(`API error: ${res.status} ${res.statusText}`);
-    }
+    if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
 
     const data = await res.json();
     const reply = data.reply || "SYSTEM_OFFLINE: Error generating response.";
@@ -60,8 +53,22 @@ export async function generateResponse(userId, input, options = {}) {
 }
 
 /**
+ * Suggestion generator for GETEAssistant
+ * Provides lightweight hints or recommendations without full LLM call
+ */
+export async function getSuggestion(userId, context = {}) {
+  if (context.activePillars?.length) {
+    return `You have active pillars: ${context.activePillars.join(", ")}. Try asking about them.`;
+  }
+  if (context.restrictedPillars?.length) {
+    return `Some pillars are restricted: ${context.restrictedPillars.join(", ")}. Access is limited.`;
+  }
+  return "Ask me anything to get started!";
+}
+
+/**
  * Diagnostic wrapper for GETEBrain
- * Provides structured status messages for UI
+ * Provides structured status messages for UI feeds
  */
 export function diagnosticStatus(status, details = null) {
   return {
