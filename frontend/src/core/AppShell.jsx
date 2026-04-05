@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { Link, Outlet, useNavigate } from "react-router-dom";
-import { registry } from "../hooks/Registry";
+import { registry } from "../core/Registry";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useAuth } from "../hooks/useAuth";
-import { supabase } from "../hooks/Registry";
+import { supabase } from "../core/Registry";
 
 export default function AppShell() {
   const { user, role } = useAuth();
