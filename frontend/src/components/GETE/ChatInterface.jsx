@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
-import { generateResponse } from "../services/geteBrain";
-import { useMemoryEvents } from "../services/useMemoryEvents";
+import { generateResponse } from "../core/geteBrain";
+import GETEPanel from "./gete/GETEPanel";
 
 export default function ChatInterface({ user }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
-  const events = useMemoryEvents(user.id);
   const chatEndRef = useRef(null);
 
   // Auto-scroll to bottom when messages update
@@ -21,46 +20,35 @@ export default function ChatInterface({ user }) {
     const userMessage = { role: "user", content: input };
     setMessages((prev) => [...prev, userMessage]);
 
-    // Generate assistant response
-    const reply = await generateResponse(user.id, input, {
-      locale: user.locale,
-      role: user.role,
-      activePillars: ["Police DB"], // Example pillar injection
-      restrictedPillars: ["Finance DB"],
-    });
+    try {
+      const reply = await generateResponse(user.id, input, {
+        locale: user.locale,
+        role: user.role,
+        activePillars: ["Police DB"], // Example injection
+        restrictedPillars: ["Finance DB"],
+      });
 
-    const assistantMessage = { role: "assistant", content: reply };
-    setMessages((prev) => [...prev, assistantMessage]);
+      const assistantMessage = { role: "assistant", content: reply };
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch (err) {
+      const errorMessage = {
+        role: "assistant",
+        content: `SYSTEM_OFFLINE: ${err.message}`,
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    }
 
     setInput("");
   }
 
   return (
     <div className="grid grid-cols-12 gap-6 h-screen bg-gray-900 text-gray-100">
-      {/* Governance Feed (Left Panel) */}
-      <aside className="col-span-4 bg-gray-800 p-4 rounded-lg shadow-neon flex flex-col">
-        <h2 className="text-xl font-bold text-neon-yellow mb-4">Governance Feed</h2>
-        <ul className="space-y-2 text-sm overflow-y-auto flex-grow">
-          {events.length === 0 ? (
-            <li className="text-gray-400">No governance events yet…</li>
-          ) : (
-            events.map((e, idx) => (
-              <li key={idx} className="border-b border-gray-700 pb-1">
-                {e.type === "system" ? (
-                  <span className="text-neon-purple">[System]: {JSON.stringify(e.payload)}</span>
-                ) : (
-                  <>
-                    <strong className="text-neon-green">{e.type}:</strong>{" "}
-                    {JSON.stringify(e.payload)}
-                  </>
-                )}
-              </li>
-            ))
-          )}
-        </ul>
+      {/* Governance Panel (Left) */}
+      <aside className="col-span-4">
+        <GETEPanel user={user} />
       </aside>
 
-      {/* Chat Interface (Right Panel) */}
+      {/* Chat Interface (Right) */}
       <main className="col-span-8 flex flex-col bg-gray-800 rounded-lg shadow-neon">
         {/* Header */}
         <header className="p-4 border-b border-gray-700">
