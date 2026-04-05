@@ -1,22 +1,22 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./hooks/useAuth";
+import { AuthProvider } from "@hooks/useAuth";
 
 // Global layout
 import AppShell from "@components/core/AppShell";
 
 // Core components
-import AuthForm from "./components/AuthForm";
-import ResetPassword from "./components/ResetPassword";
-import ResetSuccess from "./components/ResetSuccess";
-import AdminPanel from "./components/AdminPanel";
-import ProtectedRoute from "./routes/ProtectedRoute";
-import NotAuthorized from "./components/NotAuthorized";
+import AuthForm from "@components/AuthForm";
+import ResetPassword from "@components/ResetPassword";
+import ResetSuccess from "@components/ResetSuccess";
+import AdminPanel from "@components/AdminPanel";
+import ProtectedRoute from "@routes/ProtectedRoute";
+import NotAuthorized from "@components/NotAuthorized";
 
 // User pages
-import Profile from "./components/Profile";
-import Settings from "./components/Settings";
-import Dashboard from "./components/Dashboard";
+import Profile from "@components/Profile";
+import Settings from "@components/Settings";
+import Dashboard from "@components/Dashboard";
 
 export default function App() {
   return (
