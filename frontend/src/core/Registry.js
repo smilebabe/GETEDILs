@@ -11,42 +11,43 @@ export const supabase = createClient(
  * Provides a unified interface for:
  * - Supabase client
  * - Real-time subscriptions
- * - Mutation helpers for governance pillars, tutor lessons, and states
+ * - Mutation helpers with toast notifications
  */
 class Registry {
   constructor() {
     this.channels = {};
-    this.listeners = {
-      pillars: [],
-      lessons: [],
-      states: [],
-    };
+    this.listeners = { pillars: [], lessons: [], states: [] };
+    this.toastHandler = null; // global toast callback
   }
 
-  // Subscribe to table changes
-  subscribe(table) {
-    if (this.channels[table]) return; // already subscribed
+  // Attach toast handler from AppShell
+  setToastHandler(handler) {
+    this.toastHandler = handler;
+  }
 
+  notify(message, type = "success") {
+    if (this.toastHandler) this.toastHandler(message, type);
+  }
+
+  // -------------------------
+  // Real-time Subscriptions
+  // -------------------------
+  subscribe(table) {
+    if (this.channels[table]) return;
     this.channels[table] = supabase
       .channel(`${table}-changes`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table },
-        (payload) => {
-          this.emit(table, payload);
-        }
+      .on("postgres_changes", { event: "*", schema: "public", table }, (payload) =>
+        this.emit(table, payload)
       )
       .subscribe();
   }
 
-  // Emit events to listeners
   emit(table, payload) {
     if (this.listeners[table]) {
       this.listeners[table].forEach((cb) => cb(payload));
     }
   }
 
-  // Add listener
   on(table, callback) {
     if (!this.listeners[table]) this.listeners[table] = [];
     this.listeners[table].push(callback);
@@ -54,15 +55,6 @@ class Registry {
     return () => {
       this.listeners[table] = this.listeners[table].filter((cb) => cb !== callback);
     };
-  }
-
-  // Cleanup
-  unsubscribe(table) {
-    if (this.channels[table]) {
-      supabase.removeChannel(this.channels[table]);
-      delete this.channels[table];
-    }
-    this.listeners[table] = [];
   }
 
   unsubscribeAll() {
@@ -74,12 +66,12 @@ class Registry {
   }
 
   // -------------------------
-  // Mutation Helpers
+  // Mutation Helpers with Toasts
   // -------------------------
 
   async addLesson(subject, step, question, answer, role = "user") {
     if (role !== "admin") {
-      console.warn("Permission denied: only admins can add lessons.");
+      this.notify("Permission denied: only admins can add lessons.", "error");
       return null;
     }
     const { data, error } = await supabase
@@ -87,9 +79,10 @@ class Registry {
       .insert([{ subject, step, question, answer }])
       .select();
     if (error) {
-      console.error("Error adding lesson:", error);
+      this.notify("Error adding lesson: " + error.message, "error");
       return null;
     }
+    this.notify("Lesson added successfully!", "success");
     return data;
   }
 
@@ -102,7 +95,7 @@ class Registry {
 
     if (!states) return null;
     if (role !== "admin" && states.user_id !== userId) {
-      console.warn("Permission denied: cannot update another user's state.");
+      this.notify("Permission denied: cannot update another user's state.", "error");
       return null;
     }
 
@@ -112,9 +105,10 @@ class Registry {
       .eq("id", stateId)
       .select();
     if (error) {
-      console.error("Error updating state:", error);
+      this.notify("Error updating state: " + error.message, "error");
       return null;
     }
+    this.notify("State updated successfully!", "success");
     return data;
   }
 
@@ -127,7 +121,7 @@ class Registry {
 
     if (!states) return false;
     if (role !== "admin" && states.user_id !== userId) {
-      console.warn("Permission denied: cannot remove another user's state.");
+      this.notify("Permission denied: cannot remove another user's state.", "error");
       return false;
     }
 
@@ -136,15 +130,16 @@ class Registry {
       .delete()
       .eq("id", stateId);
     if (error) {
-      console.error("Error removing state:", error);
+      this.notify("Error removing state: " + error.message, "error");
       return false;
     }
+    this.notify("State removed successfully!", "success");
     return true;
   }
 
   async addPillar(name, description, role = "user") {
     if (role !== "admin") {
-      console.warn("Permission denied: only admins can add pillars.");
+      this.notify("Permission denied: only admins can add pillars.", "error");
       return null;
     }
     const { data, error } = await supabase
@@ -152,12 +147,12 @@ class Registry {
       .insert([{ name, description }])
       .select();
     if (error) {
-      console.error("Error adding pillar:", error);
+      this.notify("Error adding pillar: " + error.message, "error");
       return null;
     }
+    this.notify("Pillar added successfully!", "success");
     return data;
   }
 }
 
-// Export singleton
 export const registry = new Registry();
