@@ -1,215 +1,207 @@
 import React, { useEffect, useState } from "react";
-import { supabase, registry } from "./Registry"; // centralized client + registry
-import AppRouter from "./Router";
-import AuthForm from "../components/AuthForm";
+import { Link, Outlet, useNavigate } from "react-router-dom";
+import { registry } from "../hooks/Registry";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import { useAuth } from "../hooks/useAuth";
+import { supabase } from "../hooks/Registry";
 
-/**
- * Toast Notification Component
- */
-function Toast({ message, type, onClose }) {
-  if (!message) return null;
+export default function AppShell() {
+  const { user, role } = useAuth();
+  const navigate = useNavigate();
+  const [theme, setTheme] = useState(localStorage.getItem("theme") || "dark");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  // Attach toast handler globally
+  useEffect(() => {
+    registry.setToastHandler((msg, type) => {
+      switch (type) {
+        case "success":
+          toast.success(msg);
+          break;
+        case "error":
+          toast.error(msg);
+          break;
+        case "info":
+          toast.info(msg);
+          break;
+        default:
+          toast(msg);
+      }
+    });
+  }, []);
+
+  // Toggle theme and persist choice
+  const toggleTheme = () => {
+    const newTheme = theme === "dark" ? "light" : "dark";
+    setTheme(newTheme);
+    localStorage.setItem("theme", newTheme);
+  };
+
+  // Logout handler
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    registry.notify("Logged out successfully!", "info");
+    navigate("/login");
+  };
+
+  // Theme styles
+  const styles = {
+    dark: {
+      background: "#111",
+      color: "white",
+      headerBg: "#222",
+      linkColor: "limegreen",
+      footerBg: "#222",
+    },
+    light: {
+      background: "#f9f9f9",
+      color: "#222",
+      headerBg: "#eaeaea",
+      linkColor: "#007acc",
+      footerBg: "#eaeaea",
+    },
+  };
+
+  const themeStyles = styles[theme];
+
   return (
-    <div
-      style={{
-        position: "fixed",
-        bottom: "1rem",
-        right: "1rem",
-        background: type === "error" ? "crimson" : "limegreen",
-        color: "white",
-        padding: "0.75rem 1rem",
-        borderRadius: "6px",
-        boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
-        zIndex: 1000,
-      }}
-    >
-      {message}
-      <button
-        onClick={onClose}
+    <div style={{ background: themeStyles.background, minHeight: "100vh", color: themeStyles.color }}>
+      {/* Header */}
+      <header
         style={{
-          marginLeft: "1rem",
-          background: "transparent",
-          border: "none",
-          color: "white",
-          cursor: "pointer",
-          fontWeight: "bold",
+          background: themeStyles.headerBg,
+          padding: "1rem",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          position: "sticky",
+          top: 0,
+          zIndex: 1000,
         }}
       >
-        ×
-      </button>
-    </div>
-  );
-}
-
-/**
- * Top Navigation Bar
- * Shows links, role indicator, logout button, and real-time connection status
- */
-function NavBar({ user, onLogout, online }) {
-  return (
-    <nav
-      style={{
-        background: "#222",
-        color: "white",
-        padding: "0.75rem 1rem",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-      }}
-    >
-      <div style={{ display: "flex", gap: "1rem" }}>
-        <a href="/dashboard" style={{ color: "white", textDecoration: "none" }}>
-          Dashboard
-        </a>
-        {user?.role === "admin" && (
-          <a href="/admin" style={{ color: "white", textDecoration: "none" }}>
+        <nav>
+          <Link to="/" style={{ color: themeStyles.linkColor, marginRight: "1rem" }}>
+            Home
+          </Link>
+          <Link to="/dashboard" style={{ color: themeStyles.linkColor, marginRight: "1rem" }}>
+            Dashboard
+          </Link>
+          <Link to="/admin" style={{ color: themeStyles.linkColor }}>
             Admin
-          </a>
-        )}
-      </div>
-      <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-        <span>Role: {user?.role}</span>
-        <span
-          style={{
-            color: online ? "limegreen" : "orange",
-            fontWeight: "bold",
-          }}
-        >
-          {online ? "Online" : "Offline"}
-        </span>
-        <button
-          onClick={onLogout}
-          style={{
-            background: "crimson",
-            color: "white",
-            border: "none",
-            padding: "0.5rem 1rem",
-            cursor: "pointer",
-          }}
-        >
-          Logout
-        </button>
-      </div>
-    </nav>
-  );
-}
+          </Link>
+        </nav>
 
-/**
- * AppShell
- * Provides the main application shell:
- * - Handles Supabase Auth session
- * - Displays AuthForm when not logged in
- * - Wraps AppRouter when logged in
- * - Provides consistent layout and navigation
- * - Shows real-time connection status
- * - Toast notifications for user feedback
- */
-export default function AppShell() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [online, setOnline] = useState(false);
-  const [toast, setToast] = useState({ message: "", type: "success" });
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem", position: "relative" }}>
+          {user ? (
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: themeStyles.color,
+                  cursor: "pointer",
+                  fontWeight: "bold",
+                }}
+              >
+                {user.email} ▼
+              </button>
+              {dropdownOpen && (
+                <div
+                  style={{
+                    position: "absolute",
+                    right: 0,
+                    top: "2rem",
+                    background: themeStyles.headerBg,
+                    border: `1px solid ${themeStyles.linkColor}`,
+                    borderRadius: "6px",
+                    padding: "0.5rem",
+                    minWidth: "160px",
+                    boxShadow: "0 4px 8px rgba(0,0,0,0.3)",
+                  }}
+                >
+                  <Link
+                    to="/profile"
+                    style={{
+                      display: "block",
+                      color: themeStyles.linkColor,
+                      marginBottom: "0.5rem",
+                      textDecoration: "none",
+                    }}
+                    onClick={() => setDropdownOpen(false)}
+                  >
+                    Profile
+                  </Link>
+                  <Link
+                    to="/settings"
+                    style={{
+                      display: "block",
+                      color: themeStyles.linkColor,
+                      marginBottom: "0.5rem",
+                      textDecoration: "none",
+                    }}
+                    onClick={() => setDropdownOpen(false)}
+                  >
+                    Settings
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      color: themeStyles.linkColor,
+                      cursor: "pointer",
+                      textAlign: "left",
+                      width: "100%",
+                    }}
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <span>Not logged in</span>
+          )}
 
-  // Attach toast handler to registry
-  useEffect(() => {
-    registry.setToastHandler((message, type) => {
-      setToast({ message, type });
-      setTimeout(() => setToast({ message: "", type }), 4000);
-    });
-  }, []);
+          <button
+            onClick={toggleTheme}
+            style={{
+              background: themeStyles.linkColor,
+              color: "white",
+              border: "none",
+              padding: "0.5rem 1rem",
+              borderRadius: "4px",
+              cursor: "pointer",
+            }}
+          >
+            {theme === "dark" ? "☀ Light Mode" : "🌙 Dark Mode"}
+          </button>
+        </div>
+      </header>
 
-  // Load Supabase Auth session
-  useEffect(() => {
-    const getSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session?.user) {
-        const role =
-          session.user.app_metadata?.role ||
-          session.user.user_metadata?.role ||
-          "user";
-        setUser({ id: session.user.id, role });
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-    };
+      {/* Main content */}
+      <main style={{ padding: "2rem" }}>
+        <Outlet />
+      </main>
 
-    getSession();
+      {/* Footer */}
+      <footer
+        style={{
+          background: themeStyles.footerBg,
+          padding: "1rem",
+          textAlign: "center",
+          marginTop: "auto",
+        }}
+      >
+        <p style={{ color: theme === "dark" ? "gray" : "#555" }}>
+          © {new Date().getFullYear()} GETEDIL‑OS — Empowering Governance Through AI
+        </p>
+      </footer>
 
-    // Listen for auth changes
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        const role =
-          session.user.app_metadata?.role ||
-          session.user.user_metadata?.role ||
-          "user";
-        setUser({ id: session.user.id, role });
-      } else {
-        setUser(null);
-      }
-    });
-
-    return () => {
-      listener.subscription.unsubscribe();
-    };
-  }, []);
-
-  // Real-time connection status
-  useEffect(() => {
-    const channel = supabase.channel("connection-status");
-
-    channel
-      .on("broadcast", { event: "ping" }, () => {
-        setOnline(true);
-      })
-      .subscribe();
-
-    // Periodic ping to check connection
-    const interval = setInterval(async () => {
-      try {
-        const { error } = await supabase.from("governance_pillars").select("id").limit(1);
-        setOnline(!error);
-      } catch {
-        setOnline(false);
-      }
-    }, 5000);
-
-    return () => {
-      supabase.removeChannel(channel);
-      clearInterval(interval);
-    };
-  }, []);
-
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    setUser(null);
-    registry.notify("Logged out successfully", "success");
-  }
-
-  if (loading) {
-    return (
-      <div style={{ background: "black", color: "white", minHeight: "100vh" }}>
-        <p>Loading session...</p>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ background: "black", minHeight: "100vh" }}>
-      {!user ? (
-        <AuthForm />
-      ) : (
-        <>
-          <NavBar user={user} onLogout={handleLogout} online={online} />
-          <AppRouter user={user} />
-        </>
-      )}
-      <Toast
-        message={toast.message}
-        type={toast.type}
-        onClose={() => setToast({ message: "", type: toast.type })}
-      />
+      {/* Toast notifications */}
+      <ToastContainer position="top-right" autoClose={3000} hideProgressBar />
     </div>
   );
 }
