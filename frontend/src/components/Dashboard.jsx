@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { registry } from "../hooks/Registry";
+import { registry } from "../core/Registry";
 import { useAuth } from "../hooks/useAuth";
 import {
   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer
