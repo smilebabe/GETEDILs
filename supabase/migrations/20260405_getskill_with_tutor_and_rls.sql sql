@@ -1,0 +1,84 @@
+-- Migration: Add GetSkill pillar, Tutor lessons, and RLS policies
+
+-- Ensure governance_pillars table exists
+CREATE TABLE IF NOT EXISTS governance_pillars (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text UNIQUE NOT NULL,
+  description text,
+  created_at timestamptz DEFAULT now()
+);
+
+-- Ensure governance_states table exists
+CREATE TABLE IF NOT EXISTS governance_states (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  pillar_id uuid NOT NULL REFERENCES governance_pillars(id),
+  state text NOT NULL,
+  created_at timestamptz DEFAULT now()
+);
+
+-- Ensure tutor_lessons table exists
+CREATE TABLE IF NOT EXISTS tutor_lessons (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  subject text NOT NULL,
+  step integer NOT NULL,
+  question text NOT NULL,
+  answer text NOT NULL,
+  created_at timestamptz DEFAULT now()
+);
+
+-- Insert GetSkill pillar if not already present
+INSERT INTO governance_pillars (name, description)
+VALUES ('GetSkill', 'Provides tutoring and skill development support')
+ON CONFLICT (name) DO NOTHING;
+
+-- Seed Tutor lessons for GetSkill
+INSERT INTO tutor_lessons (subject, step, question, answer)
+VALUES
+('math', 0, 'Solve: 2x + 5 = 15', 'x=5'),
+('math', 1, 'What is 7 * 8?', '56'),
+('english', 0, 'Form a sentence using "although".', 'Although it was raining, we went outside.'),
+('english', 1, 'Identify the verb in: "She runs quickly."', 'runs'),
+('coding', 0, 'Write a line of JS that prints "Hello".', 'console.log("Hello");'),
+('coding', 1, 'What keyword declares a variable in JS?', 'let')
+ON CONFLICT DO NOTHING;
+
+-- Enable RLS on governance_states
+ALTER TABLE governance_states ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Users can only see their own governance states
+CREATE POLICY "Users can view their own governance states"
+ON governance_states
+FOR SELECT
+USING (auth.uid() = user_id);
+
+-- Policy: Users can only insert governance states for themselves
+CREATE POLICY "Users can insert their own governance states"
+ON governance_states
+FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
+-- Policy: Users can only update their own governance states
+CREATE POLICY "Users can update their own governance states"
+ON governance_states
+FOR UPDATE
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+-- Enable RLS on tutor_lessons
+ALTER TABLE tutor_lessons ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Any authenticated user can read lessons
+CREATE POLICY "Authenticated users can read tutor lessons"
+ON tutor_lessons
+FOR SELECT
+USING (auth.role() = 'authenticated');
+
+-- Enable RLS on governance_pillars
+ALTER TABLE governance_pillars ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Authenticated users can read governance pillars
+CREATE POLICY "Authenticated users can read governance pillars"
+ON governance_pillars
+FOR SELECT
+USING (auth.role() = 'authenticated');
