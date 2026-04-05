@@ -1,31 +1,94 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import path from 'path'
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { supabase } from "../hooks/Registry"; // adjust if supabase client is exported elsewhere
 
-export default defineConfig({
-  plugins: [react()],
-  root: './',
-  resolve: {
-    alias: {
-      '@hooks': path.resolve(__dirname, 'src/hooks'),
-      '@core': path.resolve(__dirname, 'src/core'),
-      '@lib': path.resolve(__dirname, 'src/lib'),
-      '@components': path.resolve(__dirname, 'src/components'),
-      '@store': path.resolve(__dirname, 'src/store'),
-      '@styles': path.resolve(__dirname, 'src/styles'),
-      '@routes': path.resolve(__dirname, 'src/routes'),
-    },
-    extensions: ['.js', '.jsx', '.ts', '.tsx', '.json']
-  },
-  build: {
-    outDir: 'dist',
-    sourcemap: true,
-    rollupOptions: {
-      external: []
-    }
-  },
-  server: {
-    port: 3000,
-    open: true
-  }
-})
+// Create an AuthContext
+const AuthContext = createContext();
+
+// Custom hook to access auth context
+export function useAuth() {
+  return useContext(AuthContext);
+}
+
+// Provider component
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Initialize session and listen for changes
+  useEffect(() => {
+    const initSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+      setLoading(false);
+    };
+
+    initSession();
+
+    // Listen for auth state changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // Auth actions
+  const signUp = async (email, password) => {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) throw error;
+    return data;
+  };
+
+  const signIn = async (email, password) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) throw error;
+    return data;
+  };
+
+  const signOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+    setUser(null);
+  };
+
+  const resetPassword = async (email) => {
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset`,
+    });
+    if (error) throw error;
+    return data;
+  };
+
+  const updatePassword = async (newPassword) => {
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+    if (error) throw error;
+    return data;
+  };
+
+  const value = {
+    user,
+    loading,
+    signUp,
+    signIn,
+    signOut,
+    resetPassword,
+    updatePassword,
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {!loading && children}
+    </AuthContext.Provider>
+  );
+}
