@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { generateResponse } from "../core/geteBrain";
-import GETEPanel from "./gete/GETEPanel";
+import GETEPanel from "../gete/GETEPanel";
 
 export default function ChatInterface({ user }) {
   const [messages, setMessages] = useState([]);
