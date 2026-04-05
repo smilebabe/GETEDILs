@@ -65,4 +65,9 @@ export default function ResetPassword() {
           </label>
         </div>
 
-        {newPassword && (
+       {newPassword && (
+  <div style={{ marginTop: "1rem" }}>
+    <p>New password set successfully!</p>
+  </div>
+)}
+
