@@ -1,54 +1,31 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { supabase } from "../lib/supabase";
-import { ROLE_LEVELS } from "../core/Registry";
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import path from 'path'
 
-const AuthContext = createContext(null);
-
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [role, setRole] = useState("guest");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Initial session check
-    supabase.auth.getSession().then(({ data }) => {
-      if (data?.session?.user) {
-        const u = data.session.user;
-        setUser(u);
-        setRole(u.user_metadata?.role || "user");
-      }
-      setLoading(false);
-    });
-
-    // Listen for auth state changes
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-        setRole(session.user.user_metadata?.role || "user");
-      } else {
-        setUser(null);
-        setRole("guest");
-      }
-    });
-
-    return () => {
-      listener.subscription.unsubscribe();
-    };
-  }, []);
-
-  // Role check helper
-  const hasRole = (requiredRole) => {
-    return ROLE_LEVELS[role] >= ROLE_LEVELS[requiredRole];
-  };
-
-  // Expose auth context
-  return (
-    <AuthContext.Provider value={{ user, role, hasRole, loading }}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-export function useAuth() {
-  return useContext(AuthContext);
-}
+export default defineConfig({
+  plugins: [react()],
+  root: './',
+  resolve: {
+    alias: {
+      '@hooks': path.resolve(__dirname, 'src/hooks'),
+      '@core': path.resolve(__dirname, 'src/core'),
+      '@lib': path.resolve(__dirname, 'src/lib'),
+      '@components': path.resolve(__dirname, 'src/components'),
+      '@store': path.resolve(__dirname, 'src/store'),
+      '@styles': path.resolve(__dirname, 'src/styles'),
+      '@routes': path.resolve(__dirname, 'src/routes'),
+    },
+    extensions: ['.js', '.jsx', '.ts', '.tsx', '.json']
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: true,
+    rollupOptions: {
+      external: []
+    }
+  },
+  server: {
+    port: 3000,
+    open: true
+  }
+})
