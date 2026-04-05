@@ -13,8 +13,8 @@ export default defineConfig({
       '@components': path.resolve(__dirname, 'src/components'),
       '@store': path.resolve(__dirname, 'src/store'),
       '@styles': path.resolve(__dirname, 'src/styles'),
+      '@routes': path.resolve(__dirname, 'src/routes'),
     },
-    // Ensure Rollup/Vite resolves these extensions automatically
     extensions: ['.js', '.jsx', '.ts', '.tsx', '.json']
   },
   build: {
