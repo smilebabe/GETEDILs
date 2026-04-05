@@ -1,57 +1,65 @@
 import { useEffect, useState } from "react";
-import { subscribeToMemoryEvents } from "./memory-service";
+import { createClient } from "@supabase/supabase-js";
+
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 /**
- * Hook: useMemoryEvents
- * @param {string} userId - The ID of the user whose memory events to subscribe to
- * @param {Object} options - Optional filter configuration
- * @param {Array<string>} options.types - Array of event types to include
- * @returns {Array} events - Array of realtime events { type, payload }
+ * React hook: subscribe to governance_events in real time
+ * @param {string} userId - UUID of the user
+ * @returns {Array} events - realtime governance events
  */
-export function useMemoryEvents(userId, options = {}) {
+export function useMemoryEvents(userId) {
   const [events, setEvents] = useState([]);
-  const { types } = options;
 
   useEffect(() => {
     if (!userId) return;
 
-    // Initial diagnostic
-    setEvents((prev) => [
-      ...prev,
-      { type: "system", payload: { status: "Connecting to Supabase…" } },
-    ]);
+    // Initial fetch of recent events
+    const fetchEvents = async () => {
+      const { data, error } = await supabase
+        .from("governance_events")
+        .select("id, action, details, created_at, pillar_id")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(20);
 
-    const handleEvent = (type, payload) => {
-      if (!types || types.includes(type)) {
-        setEvents((prev) => [...prev, { type, payload }]);
+      if (error) {
+        console.error("Error fetching governance events:", error);
+      } else {
+        setEvents(data || []);
       }
     };
 
-    try {
-      const subscription = subscribeToMemoryEvents(userId, handleEvent);
+    fetchEvents();
 
-      setEvents((prev) => [
-        ...prev,
-        { type: "system", payload: { status: "Connected ✅" } },
-      ]);
-
-      // Cleanup
-      return () => {
-        if (subscription && subscription.unsubscribe) {
-          subscription.unsubscribe();
+    // Subscribe to realtime changes
+    const channel = supabase
+      .channel("governance-events-channel")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "governance_events",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
           setEvents((prev) => [
-            ...prev,
-            { type: "system", payload: { status: "Disconnected ❌" } },
+            { ...payload.new },
+            ...prev.slice(0, 19), // keep latest 20
           ]);
         }
-      };
-    } catch (err) {
-      setEvents((prev) => [
-        ...prev,
-        { type: "system", payload: { status: "Error", details: err.message } },
-      ]);
-    }
-  }, [userId, types]);
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
 
   return events;
 }
