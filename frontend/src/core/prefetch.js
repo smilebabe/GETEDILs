@@ -1,21 +1,18 @@
 import { useEffect, useState } from "react";
 import { prefetchAll } from "../core/prefetch";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+import { registry } from "./Registry";
 
 /**
  * usePrefetch
  * React hook to load governance pillars, tutor lessons, and user states.
- * Implements stale-while-revalidate (SWR), background refresh, role-based mutations,
- * and real-time subscriptions via Supabase Realtime.
+ * Features:
+ * - SWR caching
+ * - Real-time subscriptions via Registry
+ * - Role-based mutations delegated to Registry
  *
  * @param {string} userId - UUID of the user
  * @param {string} role - 'admin' or 'user'
- * @returns {object} { data, loading, error, pillars, lessons, states, addLesson, updateState, removeState }
+ * @returns {object} { data, loading, error, pillars, lessons, states, addLesson, updateState, removeState, addPillar }
  */
 export function usePrefetch(userId, role = "user") {
   const [data, setData] = useState({ pillars: [], lessons: [], states: [] });
@@ -46,148 +43,73 @@ export function usePrefetch(userId, role = "user") {
     }
 
     loadData();
-
     return () => {
       mounted = false;
     };
   }, [userId]);
 
-  // Real-time subscriptions
+  // Real-time subscriptions via Registry
   useEffect(() => {
-    // Governance states subscription
-    const statesChannel = supabase
-      .channel("states-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "governance_states" },
-        (payload) => {
-          setData((prev) => {
-            let updatedStates = [...prev.states];
-            if (payload.eventType === "INSERT") {
-              updatedStates.push(payload.new);
-            } else if (payload.eventType === "UPDATE") {
-              updatedStates = updatedStates.map((s) =>
-                s.id === payload.new.id ? payload.new : s
-              );
-            } else if (payload.eventType === "DELETE") {
-              updatedStates = updatedStates.filter((s) => s.id !== payload.old.id);
-            }
-            return { ...prev, states: updatedStates };
-          });
-        }
-      )
-      .subscribe();
+    const offStates = registry.on("governance_states", (payload) => {
+      setData((prev) => {
+        let updated = [...prev.states];
+        if (payload.eventType === "INSERT") updated.push(payload.new);
+        if (payload.eventType === "UPDATE")
+          updated = updated.map((s) => (s.id === payload.new.id ? payload.new : s));
+        if (payload.eventType === "DELETE")
+          updated = updated.filter((s) => s.id !== payload.old.id);
+        return { ...prev, states: updated };
+      });
+    });
 
-    // Tutor lessons subscription
-    const lessonsChannel = supabase
-      .channel("lessons-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "tutor_lessons" },
-        (payload) => {
-          setData((prev) => {
-            let updatedLessons = [...prev.lessons];
-            if (payload.eventType === "INSERT") {
-              updatedLessons.push(payload.new);
-            } else if (payload.eventType === "UPDATE") {
-              updatedLessons = updatedLessons.map((l) =>
-                l.id === payload.new.id ? payload.new : l
-              );
-            } else if (payload.eventType === "DELETE") {
-              updatedLessons = updatedLessons.filter((l) => l.id !== payload.old.id);
-            }
-            return { ...prev, lessons: updatedLessons };
-          });
-        }
-      )
-      .subscribe();
+    const offLessons = registry.on("tutor_lessons", (payload) => {
+      setData((prev) => {
+        let updated = [...prev.lessons];
+        if (payload.eventType === "INSERT") updated.push(payload.new);
+        if (payload.eventType === "UPDATE")
+          updated = updated.map((l) => (l.id === payload.new.id ? payload.new : l));
+        if (payload.eventType === "DELETE")
+          updated = updated.filter((l) => l.id !== payload.old.id);
+        return { ...prev, lessons: updated };
+      });
+    });
 
-    // Governance pillars subscription
-    const pillarsChannel = supabase
-      .channel("pillars-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "governance_pillars" },
-        (payload) => {
-          setData((prev) => {
-            let updatedPillars = [...prev.pillars];
-            if (payload.eventType === "INSERT") {
-              updatedPillars.push(payload.new);
-            } else if (payload.eventType === "UPDATE") {
-              updatedPillars = updatedPillars.map((p) =>
-                p.id === payload.new.id ? payload.new : p
-              );
-            } else if (payload.eventType === "DELETE") {
-              updatedPillars = updatedPillars.filter((p) => p.id !== payload.old.id);
-            }
-            return { ...prev, pillars: updatedPillars };
-          });
-        }
-      )
-      .subscribe();
+    const offPillars = registry.on("governance_pillars", (payload) => {
+      setData((prev) => {
+        let updated = [...prev.pillars];
+        if (payload.eventType === "INSERT") updated.push(payload.new);
+        if (payload.eventType === "UPDATE")
+          updated = updated.map((p) => (p.id === payload.new.id ? payload.new : p));
+        if (payload.eventType === "DELETE")
+          updated = updated.filter((p) => p.id !== payload.old.id);
+        return { ...prev, pillars: updated };
+      });
+    });
 
     return () => {
-      supabase.removeChannel(statesChannel);
-      supabase.removeChannel(lessonsChannel);
-      supabase.removeChannel(pillarsChannel);
+      offStates();
+      offLessons();
+      offPillars();
     };
   }, []);
 
   /**
-   * Role-based mutation helpers
+   * Mutation helpers (delegated to Registry)
    */
-
   async function addLesson(subject, step, question, answer) {
-    if (role !== "admin") {
-      console.warn("Permission denied: only admins can add lessons.");
-      return null;
-    }
-    const { data: inserted, error } = await supabase
-      .from("tutor_lessons")
-      .insert([{ subject, step, question, answer }])
-      .select();
-    if (error) {
-      console.error("Error adding lesson:", error);
-      return null;
-    }
-    return inserted;
+    return registry.addLesson(subject, step, question, answer, role);
   }
 
   async function updateState(stateId, newState) {
-    const targetState = data.states.find((s) => s.id === stateId);
-    if (!targetState) return null;
-    if (role !== "admin" && targetState.user_id !== userId) {
-      console.warn("Permission denied: cannot update another user's state.");
-      return null;
-    }
-    const { data: updated, error } = await supabase
-      .from("governance_states")
-      .update({ state: newState })
-      .eq("id", stateId)
-      .select();
-    if (error) {
-      console.error("Error updating state:", error);
-      return null;
-    }
-    return updated;
+    return registry.updateState(stateId, newState, userId, role);
   }
 
   async function removeState(stateId) {
-    const targetState = data.states.find((s) => s.id === stateId);
-    if (!targetState) return false;
-    if (role !== "admin" && targetState.user_id !== userId) {
-      console.warn("Permission denied: cannot remove another user's state.");
-      return false;
-    }
-    const { error } = await supabase
-      .from("governance_states")
-      .delete()
-      .eq("id", stateId);
-    if (error) {
-      console.error("Error removing state:", error);
-      return false;
-    }
-    return true;
+    return registry.removeState(stateId, userId, role);
+  }
+
+  async function addPillar(name, description) {
+    return registry.addPillar(name, description, role);
   }
 
   return {
@@ -200,5 +122,6 @@ export function usePrefetch(userId, role = "user") {
     addLesson,
     updateState,
     removeState,
+    addPillar,
   };
 }
