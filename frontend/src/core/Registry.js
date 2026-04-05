@@ -2,8 +2,8 @@ import { createClient } from "@supabase/supabase-js";
 
 // ✅ Centralized Supabase client
 export const supabase = createClient(
-  process.env.VITE_SUPABASE_URLL,
-  process.env.VITE_SUPABASE_ANON_KEY
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 );
 
 // ✅ Role hierarchy for access control
