@@ -6,13 +6,31 @@ export const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-/**
- * Registry
- * Provides a unified interface for:
- * - Supabase client
- * - Real-time subscriptions
- * - Mutation helpers with toast notifications
- */
+// ✅ Role hierarchy for access control
+export const ROLE_LEVELS = {
+  guest: 0,
+  user: 1,
+  moderator: 2,
+  admin: 3,
+};
+
+// ✅ Centralized route paths
+export const ROUTES = {
+  home: "/",
+  login: "/login",
+  signup: "/signup",
+  reset: "/reset",
+  resetSuccess: "/reset-success",
+  dashboard: "/dashboard",
+  admin: "/admin",
+  profile: "/profile",
+};
+
+// ✅ Registry class
+// Provides a unified interface for:
+// - Supabase client
+// - Real-time subscriptions
+// - Mutation helpers with toast notifications
 class Registry {
   constructor() {
     this.channels = {};
@@ -27,6 +45,7 @@ class Registry {
 
   notify(message, type = "success") {
     if (this.toastHandler) this.toastHandler(message, type);
+    else console.log(`[${type.toUpperCase()}] ${message}`);
   }
 
   // -------------------------
@@ -70,7 +89,7 @@ class Registry {
   // -------------------------
 
   async addLesson(subject, step, question, answer, role = "user") {
-    if (role !== "admin") {
+    if (ROLE_LEVELS[role] < ROLE_LEVELS.admin) {
       this.notify("Permission denied: only admins can add lessons.", "error");
       return null;
     }
@@ -94,7 +113,7 @@ class Registry {
       .single();
 
     if (!states) return null;
-    if (role !== "admin" && states.user_id !== userId) {
+    if (ROLE_LEVELS[role] < ROLE_LEVELS.admin && states.user_id !== userId) {
       this.notify("Permission denied: cannot update another user's state.", "error");
       return null;
     }
@@ -120,7 +139,7 @@ class Registry {
       .single();
 
     if (!states) return false;
-    if (role !== "admin" && states.user_id !== userId) {
+    if (ROLE_LEVELS[role] < ROLE_LEVELS.admin && states.user_id !== userId) {
       this.notify("Permission denied: cannot remove another user's state.", "error");
       return false;
     }
@@ -138,7 +157,7 @@ class Registry {
   }
 
   async addPillar(name, description, role = "user") {
-    if (role !== "admin") {
+    if (ROLE_LEVELS[role] < ROLE_LEVELS.admin) {
       this.notify("Permission denied: only admins can add pillars.", "error");
       return null;
     }
