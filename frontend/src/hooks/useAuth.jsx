@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { supabase } from "../hooks/Registry"; // adjust if supabase client is exported elsewhere
+import Registry from "../core/Registry"; // adjust if supabase client is exported elsewhere
 
 // Create an AuthContext
 const AuthContext = createContext();
