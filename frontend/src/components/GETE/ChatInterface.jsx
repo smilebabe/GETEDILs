@@ -1,140 +1,110 @@
-// frontend/src/components/ChatInterface.jsx
-import { useState, useEffect, useRef } from 'react';
-import { supabase } from '../lib/supabase';
-import { useAuth } from '../hooks/useAuth';
-import PillarRouter from '../lib/pillarRouter'; // AI orchestration layer
+import React, { useState, useEffect, useRef } from "react";
+import { generateResponse } from "../services/geteBrain";
+import { useMemoryEvents } from "../services/useMemoryEvents";
 
-export default function ChatInterface() {
-  const { user, role, isAuthenticated } = useAuth();
+export default function ChatInterface({ user }) {
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const messagesEndRef = useRef(null);
+  const [input, setInput] = useState("");
+  const events = useMemoryEvents(user.id);
+  const chatEndRef = useRef(null);
 
-  // Scroll to bottom on new messages
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
+  // Auto-scroll to bottom when messages update
   useEffect(() => {
-    scrollToBottom();
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Load past AI conversations
-  useEffect(() => {
-    const fetchMessages = async () => {
-      const { data, error } = await supabase
-        .from('ai_conversations')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: true });
-
-      if (error) console.error(error);
-      else setMessages(data);
-    };
-
-    if (isAuthenticated) fetchMessages();
-
-    // Subscribe to real-time updates
-    const channel = supabase
-      .channel(`ai_conversations-${user?.id}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'ai_conversations', filter: `user_id=eq.${user?.id}` },
-        (payload) => {
-          setMessages((prev) => [...prev, payload.new]);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [isAuthenticated, user?.id]);
-
-  // Send a message to AI Assistant
-  const sendMessage = async () => {
+  // Handle sending a message
+  async function handleSend(e) {
+    e.preventDefault();
     if (!input.trim()) return;
-    setLoading(true);
 
-    // Route message through AI orchestration (pillar mapping)
-    const aiResponse = await PillarRouter.handleMessage({
-      user,
-      role,
-      content: input.trim(),
+    const userMessage = { role: "user", content: input };
+    setMessages((prev) => [...prev, userMessage]);
+
+    // Generate assistant response
+    const reply = await generateResponse(user.id, input, {
+      locale: user.locale,
+      role: user.role,
+      activePillars: ["Police DB"], // Example pillar injection
+      restrictedPillars: ["Finance DB"],
     });
 
-    // Save both user + AI messages
-    const { error } = await supabase.from('ai_conversations').insert([
-      {
-        user_id: user.id,
-        role,
-        sender: 'user',
-        content: input.trim(),
-      },
-      {
-        user_id: user.id,
-        role: 'ai_agent',
-        sender: 'assistant',
-        content: aiResponse,
-      },
-    ]);
+    const assistantMessage = { role: "assistant", content: reply };
+    setMessages((prev) => [...prev, assistantMessage]);
 
-    if (error) console.error(error);
-    else setInput('');
-    setLoading(false);
-  };
-
-  if (!isAuthenticated) {
-    return <p>Please log in to access GETE AI Assistance.</p>;
+    setInput("");
   }
 
   return (
-    <div className="flex flex-col h-full border rounded-lg shadow-md bg-white">
-      {/* Header */}
-      <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
-        <h2 className="font-semibold text-lg">GETE AI Assistance</h2>
-        <span className="text-sm text-gray-500">Role: {role}</span>
-      </div>
+    <div className="grid grid-cols-12 gap-6 h-screen bg-gray-900 text-gray-100">
+      {/* Governance Feed (Left Panel) */}
+      <aside className="col-span-4 bg-gray-800 p-4 rounded-lg shadow-neon flex flex-col">
+        <h2 className="text-xl font-bold text-neon-yellow mb-4">Governance Feed</h2>
+        <ul className="space-y-2 text-sm overflow-y-auto flex-grow">
+          {events.length === 0 ? (
+            <li className="text-gray-400">No governance events yet…</li>
+          ) : (
+            events.map((e, idx) => (
+              <li key={idx} className="border-b border-gray-700 pb-1">
+                {e.type === "system" ? (
+                  <span className="text-neon-purple">[System]: {JSON.stringify(e.payload)}</span>
+                ) : (
+                  <>
+                    <strong className="text-neon-green">{e.type}:</strong>{" "}
+                    {JSON.stringify(e.payload)}
+                  </>
+                )}
+              </li>
+            ))
+          )}
+        </ul>
+      </aside>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`p-3 rounded-lg max-w-lg ${
-              msg.sender === 'user'
-                ? 'bg-blue-100 self-end ml-auto'
-                : 'bg-green-100'
-            }`}
-          >
-            <p className="text-sm text-gray-700">{msg.content}</p>
-            <span className="text-xs text-gray-400">
-              {msg.sender} • {new Date(msg.created_at).toLocaleTimeString()}
-            </span>
-          </div>
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
+      {/* Chat Interface (Right Panel) */}
+      <main className="col-span-8 flex flex-col bg-gray-800 rounded-lg shadow-neon">
+        {/* Header */}
+        <header className="p-4 border-b border-gray-700">
+          <h1 className="text-2xl font-bold text-neon-green">GETE Neural Link</h1>
+          <p className="text-sm text-gray-400">Context-aware enterprise assistant</p>
+        </header>
 
-      {/* Input */}
-      <div className="p-4 border-t bg-gray-50 flex space-x-2">
-        <input
-          type="text"
-          className="flex-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:border-blue-300"
-          placeholder="Ask GETE AI anything..."
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          disabled={loading}
-        />
-        <button
-          onClick={sendMessage}
-          disabled={loading}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-        >
-          Send
-        </button>
-      </div>
+        {/* Chat Window */}
+        <div className="flex-grow overflow-y-auto p-6 space-y-4">
+          {messages.map((msg, idx) => (
+            <div
+              key={idx}
+              className={`p-3 rounded-md max-w-xl ${
+                msg.role === "user"
+                  ? "bg-neon-blue text-black self-end ml-auto"
+                  : "bg-gray-700 text-gray-100 self-start"
+              }`}
+            >
+              <strong>{msg.role === "user" ? "You" : "Assistant"}:</strong>{" "}
+              {msg.content}
+            </div>
+          ))}
+          <div ref={chatEndRef} />
+        </div>
+
+        {/* Input Bar */}
+        <footer className="p-4 border-t border-gray-700 flex space-x-2">
+          <form onSubmit={handleSend} className="flex w-full space-x-2">
+            <input
+              type="text"
+              value={input}
+              placeholder="Input Command..."
+              onChange={(e) => setInput(e.target.value)}
+              className="flex-grow px-4 py-2 rounded-md bg-gray-700 text-gray-100 focus:outline-none focus:ring-2 focus:ring-neon-green"
+            />
+            <button
+              type="submit"
+              className="px-4 py-2 bg-neon-green text-black font-semibold rounded-md hover:bg-green-400 transition shadow-neon"
+            >
+              SEND
+            </button>
+          </form>
+        </footer>
+      </main>
     </div>
   );
 }
