@@ -1,11 +1,7 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@hooks/useAuth";
-
-// Global layout
 import AppShell from "@components/core/AppShell";
-
-// Core components
 import AuthForm from "@components/AuthForm";
 import ResetPassword from "@components/ResetPassword";
 import ResetSuccess from "@components/ResetSuccess";
