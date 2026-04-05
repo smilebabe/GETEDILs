@@ -69,5 +69,6 @@ export default function ResetPassword() {
   <div style={{ marginTop: "1rem" }}>
     <p>New password set successfully!</p>
   </div>
-)}
-
+)
+       }
+        
