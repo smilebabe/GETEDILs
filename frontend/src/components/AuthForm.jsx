@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { supabase, registry } from "../hooks/Registry";
+import { supabase, registry } from "../core/Registry";
 
 function getPasswordStrength(password) {
   let score = 0;
